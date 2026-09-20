@@ -25,11 +25,15 @@ class ShopifyClientTests {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         ShopifyProperties properties = new ShopifyProperties(
                 "example.myshopify.com",
-                "test-token",
-                "2026-07"
+                "client-id",
+                "client-secret",
+                "2026-07",
+                "http://localhost:8080/api/shopify/callback"
         );
         RestClient restClient = new ShopifyConfig().buildShopifyRestClient(builder, properties);
-        ShopifyClient client = new ShopifyClient(restClient);
+        ShopifyTokenStore tokenStore = new ShopifyTokenStore();
+        tokenStore.store("example.myshopify.com", "test-token");
+        ShopifyClient client = new ShopifyClient(restClient, tokenStore);
 
         server.expect(requestTo("https://example.myshopify.com/admin/api/2026-07/graphql.json"))
                 .andExpect(method(HttpMethod.POST))

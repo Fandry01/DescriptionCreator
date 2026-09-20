@@ -2,6 +2,7 @@ package com.descriptioncreator.backend.product;
 
 import com.descriptioncreator.backend.shopify.ShopifyClient;
 import com.descriptioncreator.backend.shopify.ShopifyProductDto;
+import com.descriptioncreator.backend.shopify.ShopifyTokenStore;
 import org.junit.jupiter.api.Test;
 
 import java.time.OffsetDateTime;
@@ -39,7 +40,10 @@ class ProductServiceTests {
     }
 
     private ProductService productServiceWith(List<ShopifyProductDto> products) {
-        ShopifyClient shopifyClient = new ShopifyClient(org.springframework.web.client.RestClient.create()) {
+        ShopifyClient shopifyClient = new ShopifyClient(
+                org.springframework.web.client.RestClient.create(),
+                new ShopifyTokenStore()
+        ) {
             @Override
             public List<ShopifyProductDto> fetchProducts() {
                 return products;

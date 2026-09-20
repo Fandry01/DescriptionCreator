@@ -26,13 +26,20 @@ public class ShopifyClient {
             """;
 
     private final RestClient restClient;
+    private final ShopifyTokenStore tokenStore;
 
-    public ShopifyClient(@Qualifier("shopifyRestClient") RestClient restClient) {
+    public ShopifyClient(
+            @Qualifier("shopifyRestClient") RestClient restClient,
+            ShopifyTokenStore tokenStore
+    ) {
         this.restClient = restClient;
+        this.tokenStore = tokenStore;
     }
 
     public List<ShopifyProductDto> fetchProducts() {
         ShopifyGraphQlResponse response = restClient.post()
+                .header("X-Shopify-Access-Token", tokenStore.accessToken()
+                        .orElseThrow(() -> new IllegalStateException("Shopify is not connected")))
                 .body(Map.of("query", PRODUCTS_QUERY))
                 .retrieve()
                 .body(ShopifyGraphQlResponse.class);

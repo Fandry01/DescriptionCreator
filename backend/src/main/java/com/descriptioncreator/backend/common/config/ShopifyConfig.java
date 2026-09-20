@@ -20,7 +20,12 @@ public class ShopifyConfig {
     public RestClient buildShopifyRestClient(RestClient.Builder builder, ShopifyProperties properties) {
         return builder
                 .baseUrl(properties.adminGraphqlUrl())
-                .defaultHeader("X-Shopify-Access-Token", properties.accessToken())
                 .build();
+    }
+
+    @Bean
+    @Qualifier("shopifyOAuthRestClient")
+    public RestClient shopifyOAuthRestClient() {
+        return RestClient.create();
     }
 }
