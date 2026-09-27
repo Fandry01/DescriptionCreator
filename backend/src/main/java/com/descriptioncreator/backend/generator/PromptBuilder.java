@@ -20,11 +20,11 @@ public class PromptBuilder {
 
                 Write one polished English paragraph of about 90–145 words. Use natural British English and a premium, restrained luxury resale tone.
 
-                Use only the supplied product title and facts. Never infer or invent missing details. In particular, never invent accessories, year, material, colour, hardware, provenance, rarity, authenticity documentation, usage context, or marketing claims.
+                Use only the supplied product title and facts. Every concrete descriptive claim must be directly traceable to the product title or one supplied fact. Never infer or invent missing details. In particular, never invent accessories, year, material, colour, hardware, provenance, rarity, authenticity documentation, usage context, or marketing claims.
 
-                Do not infer shoulder wear or cross-body wear. Do not infer day-to-evening use, everyday use, practicality, or capacity. Do not infer a matte finish, leather grain, woven texture, shape, opening style, or structural characteristics unless directly supported by the supplied facts or unambiguously stated in the product title. Do not call included accessories original, complete, or a full set unless that wording is explicitly supplied. Do not state that information is missing.
+                Do not mention or infer condition, condition grades, or signs of wear. Do not infer sheen, softness, silhouette, construction, detailing, craftsmanship, styling character, use cases, or quality adjectives about physical properties. Do not infer shoulder wear or cross-body wear. Do not infer day-to-evening use, everyday use, practicality, or capacity. Do not infer a matte finish, leather grain, woven texture, shape, opening style, or structural characteristics unless directly supported by the supplied facts or unambiguously stated in the product title. Do not call included accessories original, complete, or a full set unless that wording is explicitly supplied. Do not state that information is missing.
 
-                Mention included accessories only when the includes fact is present. Do not include measurements or length details in the editorial paragraph.
+                Mention included accessories only when the includes fact is present. Do not include measurements or length details in the editorial paragraph. Restrained editorial language is acceptable only when it does not add a new factual claim.
 
                 Do not use markdown, headings, bullet points, or HTML. Return only the final paragraph.
 

@@ -46,6 +46,8 @@ class ProductDescriptionServiceTests {
         assertThat(factsMapper.mappedProduct).isSameAs(product);
         assertThat(generator.title).isEqualTo(product.title());
         assertThat(generator.facts).isSameAs(facts);
+        assertThat(response.facts().grade()).isEqualTo("2");
+        assertThat(response.facts().gradeLabel()).isEqualTo("Excellent Condition");
         assertThat(shopifyClient.published).isFalse();
     }
 

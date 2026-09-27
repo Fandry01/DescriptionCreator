@@ -45,6 +45,18 @@ class DescriptionGeneratorServiceTests {
     }
 
     @Test
+    void doesNotAppendConditionPhrasesToGeneratedText() {
+        DescriptionGeneratorService service = new DescriptionGeneratorService(
+                promptBuilder,
+                prompt -> "Editorial description only."
+        );
+
+        assertThat(service.generate("Gucci Jackie 1961", productFacts))
+                .isEqualTo("Editorial description only.")
+                .doesNotContain("Excellent Condition", "condition", "signs of wear");
+    }
+
+    @Test
     void rejectsBlankGeneratedDescription() {
         DescriptionGeneratorService service = new DescriptionGeneratorService(
                 promptBuilder,

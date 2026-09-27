@@ -64,7 +64,7 @@ class PromptBuilderTests {
 
     @Test
     void includesOnlyEditorialFactsAndExcludesConditionData() {
-        String prompt = promptBuilder.build("Gucci Jackie 1961", facts(
+        ProductFacts productFacts = facts(
                 "Gucci",
                 "Jackie 1961",
                 "Black",
@@ -79,7 +79,8 @@ class PromptBuilderTests {
                 "",
                 "2022",
                 "WEAR_SENTINEL"
-        ));
+        );
+        String prompt = promptBuilder.build("Gucci Jackie 1961", productFacts);
 
         assertThat(prompt)
                 .contains("\"brand\":\"Gucci\"")
@@ -94,6 +95,15 @@ class PromptBuilderTests {
                 .doesNotContain("WEAR_SENTINEL")
                 .doesNotContain("Mention the condition naturally near the end")
                 .doesNotContain("Mention signs of wear");
+        assertThat(promptBuilder.buildFactsMap(productFacts)).containsExactly(
+                entry("brand", "Gucci"),
+                entry("model", "Jackie 1961"),
+                entry("color", "Black"),
+                entry("material", "Leather"),
+                entry("hardware", "Gold-tone"),
+                entry("year", "2022"),
+                entry("includes", "Dust bag")
+        );
     }
 
     @Test
@@ -120,6 +130,10 @@ class PromptBuilderTests {
 
         assertThat(prompt)
                 .contains("Shopify product title:\n\"Gucci Jackie 1961 shoulder bag\"")
+                .contains("Every concrete descriptive claim must be directly traceable")
+                .contains("Do not mention or infer condition, condition grades, or signs of wear")
+                .contains("Do not infer sheen, softness, silhouette, construction, detailing, craftsmanship, styling character, use cases, or quality adjectives about physical properties")
+                .contains("Restrained editorial language is acceptable only when it does not add a new factual claim")
                 .contains("Do not infer shoulder wear or cross-body wear")
                 .contains("Do not infer day-to-evening use, everyday use, practicality, or capacity")
                 .contains("Do not state that information is missing")
