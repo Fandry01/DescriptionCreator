@@ -63,27 +63,37 @@ class PromptBuilderTests {
     }
 
     @Test
-    void includesGradeLabelAndSignsOfWearWhenPresent() {
+    void includesOnlyEditorialFactsAndExcludesConditionData() {
         String prompt = promptBuilder.build("Gucci Jackie 1961", facts(
                 "Gucci",
                 "Jackie 1961",
                 "Black",
-                "2",
-                "Excellent Condition",
+                "GRADE_SENTINEL",
+                "GRADE_LABEL_SENTINEL",
                 "Leather",
+                "Gold-tone",
+                "Dust bag",
                 "",
                 "",
                 "",
                 "",
-                "",
-                "",
-                "",
-                "Light corner wear"
+                "2022",
+                "WEAR_SENTINEL"
         ));
 
         assertThat(prompt)
-                .contains("\"gradeLabel\":\"Excellent Condition\"")
-                .contains("\"signsOfWear\":\"Light corner wear\"");
+                .contains("\"brand\":\"Gucci\"")
+                .contains("\"model\":\"Jackie 1961\"")
+                .contains("\"color\":\"Black\"")
+                .contains("\"material\":\"Leather\"")
+                .contains("\"hardware\":\"Gold-tone\"")
+                .contains("\"year\":\"2022\"")
+                .contains("\"includes\":\"Dust bag\"")
+                .doesNotContain("GRADE_SENTINEL")
+                .doesNotContain("GRADE_LABEL_SENTINEL")
+                .doesNotContain("WEAR_SENTINEL")
+                .doesNotContain("Mention the condition naturally near the end")
+                .doesNotContain("Mention signs of wear");
     }
 
     @Test

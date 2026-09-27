@@ -24,7 +24,7 @@ public class PromptBuilder {
 
                 Do not infer shoulder wear or cross-body wear. Do not infer day-to-evening use, everyday use, practicality, or capacity. Do not infer a matte finish, leather grain, woven texture, shape, opening style, or structural characteristics unless directly supported by the supplied facts or unambiguously stated in the product title. Do not call included accessories original, complete, or a full set unless that wording is explicitly supplied. Do not state that information is missing.
 
-                Mention included accessories only when the includes fact is present. Mention the condition naturally near the end when gradeLabel is present. Mention signs of wear only when signsOfWear is present. Do not include measurements or length details in the editorial paragraph.
+                Mention included accessories only when the includes fact is present. Do not include measurements or length details in the editorial paragraph.
 
                 Do not use markdown, headings, bullet points, or HTML. Return only the final paragraph.
 
@@ -46,8 +46,6 @@ public class PromptBuilder {
         putIfPresent(facts, "material", productFacts.material());
         putIfPresent(facts, "hardware", productFacts.hardware());
         putIfPresent(facts, "year", productFacts.year());
-        putIfPresent(facts, "gradeLabel", productFacts.gradeLabel());
-        putIfPresent(facts, "signsOfWear", productFacts.signsOfWear());
         putIfPresent(facts, "includes", productFacts.includes());
         return Collections.unmodifiableMap(facts);
     }
