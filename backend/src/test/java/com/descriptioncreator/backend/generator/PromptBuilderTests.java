@@ -137,7 +137,11 @@ class PromptBuilderTests {
                 .contains("Do not infer shoulder wear or cross-body wear")
                 .contains("Do not infer day-to-evening use, everyday use, practicality, or capacity")
                 .contains("Do not state that information is missing")
-                .contains("Do not call included accessories original, complete, or a full set");
+                .contains("Do not call included accessories original, complete, or a full set")
+                .contains("Write directly about the product as a finished customer-facing description")
+                .contains("Do not refer to the source data, listing, supplied facts, confirmed details, attributes, or product information")
+                .contains("\"as specified\", \"as stated\", \"as supplied\", \"the listing\", \"the supplied facts\", \"confirmed details\", \"stated attributes\", \"this entry\", \"product information\", or \"the provided information\"")
+                .contains("Do not explain what information you are using or describe the generation process");
     }
 
     private ProductFacts facts(

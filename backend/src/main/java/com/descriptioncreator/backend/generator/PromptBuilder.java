@@ -26,6 +26,8 @@ public class PromptBuilder {
 
                 Mention included accessories only when the includes fact is present. Do not include measurements or length details in the editorial paragraph. Restrained editorial language is acceptable only when it does not add a new factual claim.
 
+                Write directly about the product as a finished customer-facing description. Do not refer to the source data, listing, supplied facts, confirmed details, attributes, or product information. Avoid phrases such as "as specified", "as stated", "as supplied", "the listing", "the supplied facts", "confirmed details", "stated attributes", "this entry", "product information", or "the provided information". Do not explain what information you are using or describe the generation process.
+
                 Do not use markdown, headings, bullet points, or HTML. Return only the final paragraph.
 
                 Shopify product title:
