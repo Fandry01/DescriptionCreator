@@ -51,6 +51,20 @@ public class ShopifyClient {
             }
             """;
 
+    static final String UPDATE_PRODUCT_DESCRIPTION_MUTATION = """
+            mutation UpdateProductDescription($product: ProductUpdateInput!) {
+              productUpdate(product: $product) {
+                product {
+                  id
+                }
+                userErrors {
+                  field
+                  message
+                }
+              }
+            }
+            """;
+
     private final RestClient restClient;
     private final ShopifyTokenStore tokenStore;
 
@@ -143,6 +157,22 @@ public class ShopifyClient {
         ));
     }
 
+    public void updateProductDescription(String productId, String descriptionHtml) {
+        ShopifyDescriptionUpdateRequest descriptionUpdate =
+                new ShopifyDescriptionUpdateRequest(productId, descriptionHtml);
+
+        ShopifyDescriptionUpdateGraphQlResponse response = restClient.post()
+                .header("X-Shopify-Access-Token", accessToken())
+                .body(Map.of(
+                        "query", UPDATE_PRODUCT_DESCRIPTION_MUTATION,
+                        "variables", Map.of("product", descriptionUpdate)
+                ))
+                .retrieve()
+                .body(ShopifyDescriptionUpdateGraphQlResponse.class);
+
+        validateDescriptionUpdateResponse(response);
+    }
+
     private String accessToken() {
         return tokenStore.accessToken()
                 .orElseThrow(() -> new IllegalStateException("Shopify is not connected"));
@@ -161,6 +191,31 @@ public class ShopifyClient {
         }
         if (response.data() == null) {
             throw new IllegalStateException("Shopify response did not contain data");
+        }
+    }
+
+    private void validateDescriptionUpdateResponse(ShopifyDescriptionUpdateGraphQlResponse response) {
+        if (response == null) {
+            throw new IllegalStateException("Shopify returned an empty response");
+        }
+        if (response.errors() != null && !response.errors().isEmpty()) {
+            String messages = response.errors().stream()
+                    .map(ShopifyDescriptionUpdateGraphQlResponse.GraphQlError::message)
+                    .reduce((first, second) -> first + "; " + second)
+                    .orElse("Unknown GraphQL error");
+            throw new IllegalStateException("Shopify GraphQL request failed: " + messages);
+        }
+        if (response.data() == null || response.data().productUpdate() == null) {
+            throw new IllegalStateException("Shopify response did not contain product update data");
+        }
+        List<ShopifyDescriptionUpdateGraphQlResponse.UserError> userErrors =
+                response.data().productUpdate().userErrors();
+        if (userErrors != null && !userErrors.isEmpty()) {
+            String messages = userErrors.stream()
+                    .map(ShopifyDescriptionUpdateGraphQlResponse.UserError::message)
+                    .reduce((first, second) -> first + "; " + second)
+                    .orElse("Unknown product update error");
+            throw new IllegalStateException("Shopify rejected the description update: " + messages);
         }
     }
 }

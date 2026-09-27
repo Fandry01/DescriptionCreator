@@ -49,7 +49,7 @@ class ShopifyOAuthServiceTests {
                 "https://example.myshopify.com/admin/oauth/authorize?"
         );
         assertThat(authorizationParameters.getFirst("client_id")).isEqualTo("client-id");
-        assertThat(authorizationParameters.getFirst("scope")).isEqualTo("read_products");
+        assertThat(authorizationParameters.getFirst("scope")).isEqualTo("write_products");
 
         MultiValueMap<String, String> callback = callbackParameters(
                 authorizationParameters.getFirst("state"),
@@ -64,7 +64,7 @@ class ShopifyOAuthServiceTests {
                 .andRespond(withSuccess("""
                         {
                           "access_token": "shpat_test_token",
-                          "scope": "read_products"
+                          "scope": "write_products"
                         }
                         """, MediaType.APPLICATION_JSON));
 

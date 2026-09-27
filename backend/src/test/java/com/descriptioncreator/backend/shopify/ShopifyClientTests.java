@@ -6,8 +6,10 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -117,6 +119,56 @@ class ShopifyClientTests {
         assertThat(result.orElseThrow().metafields())
                 .extracting(ShopifyProductMetafieldsDto.Metafield::key)
                 .containsExactly("material", "subtitle");
+        server.verify();
+    }
+
+    @Test
+    void updatesOnlyTheProductDescription() throws Exception {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        ShopifyProperties properties = new ShopifyProperties(
+                "example.myshopify.com",
+                "client-id",
+                "client-secret",
+                "2026-07",
+                "http://localhost:8080/api/shopify/callback"
+        );
+        ShopifyTokenStore tokenStore = new ShopifyTokenStore();
+        tokenStore.store("example.myshopify.com", "test-token");
+        ShopifyClient client = new ShopifyClient(
+                new ShopifyConfig().buildShopifyRestClient(builder, properties),
+                tokenStore
+        );
+        String expectedBody = new ObjectMapper().writeValueAsString(Map.of(
+                "query", ShopifyClient.UPDATE_PRODUCT_DESCRIPTION_MUTATION,
+                "variables", Map.of(
+                        "product", new ShopifyDescriptionUpdateRequest(
+                                "gid://shopify/Product/1",
+                                "<p>Approved description</p>"
+                        )
+                )
+        ));
+
+        server.expect(requestTo("https://example.myshopify.com/admin/api/2026-07/graphql.json"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header("X-Shopify-Access-Token", "test-token"))
+                .andExpect(content().json(expectedBody, true))
+                .andRespond(withSuccess("""
+                        {
+                          "data": {
+                            "productUpdate": {
+                              "product": {"id": "gid://shopify/Product/1"},
+                              "userErrors": []
+                            }
+                          }
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        client.updateProductDescription(
+                "gid://shopify/Product/1",
+                "<p>Approved description</p>"
+        );
+
         server.verify();
     }
 

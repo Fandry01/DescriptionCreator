@@ -35,7 +35,7 @@ import static org.springframework.http.HttpStatus.FORBIDDEN;
 @Service
 public class ShopifyOAuthService {
 
-    private static final String REQUIRED_SCOPE = "read_products";
+    private static final String REQUIRED_SCOPE = "write_products";
     private static final Duration STATE_LIFETIME = Duration.ofMinutes(10);
     private static final Pattern SHOP_DOMAIN = Pattern.compile(
             "^[a-zA-Z0-9][a-zA-Z0-9-]*\\.myshopify\\.com$"
@@ -114,7 +114,7 @@ public class ShopifyOAuthService {
             throw new ResponseStatusException(BAD_GATEWAY, "Shopify did not return an access token");
         }
         if (!hasRequiredScope(tokenResponse.scope())) {
-            throw new ResponseStatusException(FORBIDDEN, "Shopify did not grant read_products");
+            throw new ResponseStatusException(FORBIDDEN, "Shopify did not grant write_products");
         }
 
         tokenStore.store(shop, tokenResponse.access_token());
