@@ -1,6 +1,7 @@
 package com.descriptioncreator.backend.product;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,5 +23,10 @@ public class ProductController {
             @RequestParam(defaultValue = "false") boolean missingDescription
     ) {
         return productService.getProducts(missingDescription);
+    }
+
+    @GetMapping("/handle/{handle}/metafields")
+    public ProductMetafieldsResponse getProductMetafields(@PathVariable String handle) {
+        return productService.getProductMetafields(handle);
     }
 }

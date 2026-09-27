@@ -2,11 +2,13 @@ package com.descriptioncreator.backend.product;
 
 import com.descriptioncreator.backend.shopify.ShopifyClient;
 import com.descriptioncreator.backend.shopify.ShopifyProductDto;
+import com.descriptioncreator.backend.shopify.ShopifyProductMetafieldsDto;
 import com.descriptioncreator.backend.shopify.ShopifyTokenStore;
 import org.junit.jupiter.api.Test;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 class ProductServiceTests {
@@ -39,6 +41,33 @@ class ProductServiceTests {
                 .containsExactly("1", "2", "3", "4");
     }
 
+    @Test
+    void mapsProductMetafieldsResponse() {
+        ShopifyProductMetafieldsDto shopifyProduct = new ShopifyProductMetafieldsDto(
+                "gid://shopify/Product/1",
+                "Test product",
+                "test-product",
+                List.of(new ShopifyProductMetafieldsDto.Metafield(
+                        "custom",
+                        "material",
+                        "Leather",
+                        "single_line_text_field"
+                ))
+        );
+        ShopifyClient shopifyClient = shopifyClientWithMetafields(Optional.of(shopifyProduct));
+
+        ProductMetafieldsResponse response =
+                new ProductService(shopifyClient).getProductMetafields("test-product");
+
+        assertThat(response.handle()).isEqualTo("test-product");
+        assertThat(response.metafields()).singleElement().satisfies(metafield -> {
+            assertThat(metafield.namespace()).isEqualTo("custom");
+            assertThat(metafield.key()).isEqualTo("material");
+            assertThat(metafield.value()).isEqualTo("Leather");
+            assertThat(metafield.type()).isEqualTo("single_line_text_field");
+        });
+    }
+
     private ProductService productServiceWith(List<ShopifyProductDto> products) {
         ShopifyClient shopifyClient = new ShopifyClient(
                 org.springframework.web.client.RestClient.create(),
@@ -50,6 +79,20 @@ class ProductServiceTests {
             }
         };
         return new ProductService(shopifyClient);
+    }
+
+    private ShopifyClient shopifyClientWithMetafields(
+            Optional<ShopifyProductMetafieldsDto> product
+    ) {
+        return new ShopifyClient(
+                org.springframework.web.client.RestClient.create(),
+                new ShopifyTokenStore()
+        ) {
+            @Override
+            public Optional<ShopifyProductMetafieldsDto> fetchProductMetafieldsByHandle(String handle) {
+                return product;
+            }
+        };
     }
 
     private ShopifyProductDto product(String id, String descriptionHtml) {
