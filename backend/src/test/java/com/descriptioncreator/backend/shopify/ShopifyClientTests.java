@@ -136,6 +136,7 @@ class ShopifyClientTests {
                       "id": "gid://shopify/Product/1",
                       "title": "Test product",
                       "handle": "test-product",
+                      "vendor": "Test brand",
                       "metafields": {
                         "nodes": [
                           {

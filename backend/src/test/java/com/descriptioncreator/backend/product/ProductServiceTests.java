@@ -47,6 +47,7 @@ class ProductServiceTests {
                 "gid://shopify/Product/1",
                 "Test product",
                 "test-product",
+                "Test brand",
                 List.of(new ShopifyProductMetafieldsDto.Metafield(
                         "custom",
                         "material",
