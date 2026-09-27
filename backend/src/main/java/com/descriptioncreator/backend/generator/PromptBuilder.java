@@ -11,21 +11,29 @@ import java.util.stream.Collectors;
 @Component
 public class PromptBuilder {
 
-    public String build(ProductFacts productFacts) {
+    public String build(String title, ProductFacts productFacts) {
         Map<String, String> facts = buildFactsMap(productFacts);
+        String productTitle = title == null ? "" : title.trim();
 
         return """
                 You write product descriptions for Designer Stories, a premium luxury resale catalogue.
 
                 Write one polished English paragraph of about 90–145 words. Use natural British English and a premium, restrained luxury resale tone.
 
-                Use only the supplied facts. Never infer or invent missing details. In particular, never invent accessories, year, material, colour, hardware, provenance, rarity, authenticity documentation, usage context, or marketing claims. Mention included accessories only when the includes fact is present. Mention the condition naturally near the end when gradeLabel is present. Mention signs of wear only when signsOfWear is present. Do not include measurements or length details in the editorial paragraph.
+                Use only the supplied product title and facts. Never infer or invent missing details. In particular, never invent accessories, year, material, colour, hardware, provenance, rarity, authenticity documentation, usage context, or marketing claims.
+
+                Do not infer shoulder wear or cross-body wear. Do not infer day-to-evening use, everyday use, practicality, or capacity. Do not infer a matte finish, leather grain, woven texture, shape, opening style, or structural characteristics unless directly supported by the supplied facts or unambiguously stated in the product title. Do not call included accessories original, complete, or a full set unless that wording is explicitly supplied. Do not state that information is missing.
+
+                Mention included accessories only when the includes fact is present. Mention the condition naturally near the end when gradeLabel is present. Mention signs of wear only when signsOfWear is present. Do not include measurements or length details in the editorial paragraph.
 
                 Do not use markdown, headings, bullet points, or HTML. Return only the final paragraph.
 
+                Shopify product title:
+                "%s"
+
                 Supplied facts:
                 %s
-                """.formatted(toCompactJson(facts)).trim();
+                """.formatted(escape(productTitle), toCompactJson(facts)).trim();
     }
 
     Map<String, String> buildFactsMap(ProductFacts productFacts) {

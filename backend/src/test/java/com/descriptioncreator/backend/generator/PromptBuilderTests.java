@@ -38,7 +38,7 @@ class PromptBuilderTests {
 
     @Test
     void excludesMeasurementFactsFromPrompt() {
-        String prompt = promptBuilder.build(facts(
+        String prompt = promptBuilder.build("Gucci Jackie 1961", facts(
                 "Gucci",
                 "Jackie 1961",
                 "Black",
@@ -64,7 +64,7 @@ class PromptBuilderTests {
 
     @Test
     void includesGradeLabelAndSignsOfWearWhenPresent() {
-        String prompt = promptBuilder.build(facts(
+        String prompt = promptBuilder.build("Gucci Jackie 1961", facts(
                 "Gucci",
                 "Jackie 1961",
                 "Black",
@@ -88,17 +88,32 @@ class PromptBuilderTests {
 
     @Test
     void includesAccessoriesOnlyWhenPresent() {
-        String withAccessories = promptBuilder.build(facts(
+        String withAccessories = promptBuilder.build("Gucci bag", facts(
                 "Gucci", "", "", "", "", "", "", "  Dust bag  ",
                 "", "", "", "", "", ""
         ));
-        String withoutAccessories = promptBuilder.build(facts(
+        String withoutAccessories = promptBuilder.build("Gucci bag", facts(
                 "Gucci", "", "", "", "", "", "", "   ",
                 "", "", "", "", "", ""
         ));
 
         assertThat(withAccessories).contains("\"includes\":\"Dust bag\"");
         assertThat(withoutAccessories).doesNotContain("\"includes\":");
+    }
+
+    @Test
+    void includesShopifyTitleAndStrictFactualSafetyRules() {
+        String prompt = promptBuilder.build("  Gucci Jackie 1961 shoulder bag  ", facts(
+                "Gucci", "Jackie 1961", "", "", "", "", "", "",
+                "", "", "", "", "", ""
+        ));
+
+        assertThat(prompt)
+                .contains("Shopify product title:\n\"Gucci Jackie 1961 shoulder bag\"")
+                .contains("Do not infer shoulder wear or cross-body wear")
+                .contains("Do not infer day-to-evening use, everyday use, practicality, or capacity")
+                .contains("Do not state that information is missing")
+                .contains("Do not call included accessories original, complete, or a full set");
     }
 
     private ProductFacts facts(
