@@ -11,6 +11,7 @@ import org.springframework.web.client.RestClient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -24,16 +25,16 @@ class OpenAiResponsesClientTests {
     void sendsResponsesApiRequestAndParsesOutputText() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        OpenAiProperties properties = new OpenAiProperties("test-api-key", "gpt-5.6");
+        OpenAiProperties properties = new OpenAiProperties("test-api-key", "gpt-5-mini");
         RestClient restClient = new OpenAiConfig().buildOpenAiRestClient(builder, properties);
         OpenAiResponsesClient client = new OpenAiResponsesClient(restClient, properties);
 
         server.expect(requestTo("https://api.openai.com/v1/responses"))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header("Authorization", "Bearer test-api-key"))
-                .andExpect(content().string(containsString("\"model\":\"gpt-5.6\"")))
+                .andExpect(content().string(containsString("\"model\":\"gpt-5-mini\"")))
                 .andExpect(content().string(containsString("\"input\":\"Write one paragraph\"")))
-                .andExpect(content().string(containsString("\"effort\":\"low\"")))
+                .andExpect(content().string(not(containsString("\"reasoning\""))))
                 .andRespond(withSuccess("""
                         {
                           "id": "resp_test",
@@ -44,7 +45,7 @@ class OpenAiResponsesClientTests {
                               "content": [
                                 {
                                   "type": "output_text",
-                                  "text": "Generated description"
+                                  "text": "  Generated description  "
                                 }
                               ]
                             }
@@ -59,7 +60,7 @@ class OpenAiResponsesClientTests {
 
     @Test
     void rejectsMissingApiKeyBeforeRequest() {
-        OpenAiProperties properties = new OpenAiProperties(" ", "gpt-5.6");
+        OpenAiProperties properties = new OpenAiProperties(" ", "gpt-5-mini");
         OpenAiResponsesClient client = new OpenAiResponsesClient(
                 RestClient.create("https://api.openai.com/v1"),
                 properties
@@ -74,7 +75,7 @@ class OpenAiResponsesClientTests {
     void wrapsResponsesApiFailure() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        OpenAiProperties properties = new OpenAiProperties("test-api-key", "gpt-5.6");
+        OpenAiProperties properties = new OpenAiProperties("test-api-key", "gpt-5-mini");
         RestClient restClient = new OpenAiConfig().buildOpenAiRestClient(builder, properties);
         OpenAiResponsesClient client = new OpenAiResponsesClient(restClient, properties);
 
@@ -84,6 +85,30 @@ class OpenAiResponsesClientTests {
         assertThatThrownBy(() -> client.generate("Prompt"))
                 .isInstanceOf(OpenAiException.class)
                 .hasMessage("OpenAI Responses API request failed");
+        server.verify();
+    }
+
+    @Test
+    void rejectsBlankOutputText() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        OpenAiProperties properties = new OpenAiProperties("test-api-key", "gpt-5-mini");
+        RestClient restClient = new OpenAiConfig().buildOpenAiRestClient(builder, properties);
+        OpenAiResponsesClient client = new OpenAiResponsesClient(restClient, properties);
+
+        server.expect(requestTo("https://api.openai.com/v1/responses"))
+                .andRespond(withSuccess("""
+                        {
+                          "output": [{
+                            "type": "message",
+                            "content": [{"type": "output_text", "text": "   "}]
+                          }]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> client.generate("Prompt"))
+                .isInstanceOf(OpenAiException.class)
+                .hasMessage("OpenAI returned an empty description");
         server.verify();
     }
 }

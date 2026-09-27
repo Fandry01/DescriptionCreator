@@ -6,7 +6,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -44,18 +43,18 @@ public class OpenAiResponsesClient implements OpenAiClient {
             throw new OpenAiException("OpenAI Responses API returned an empty response");
         }
 
-        return response.outputText();
+        String outputText = response.outputText().trim();
+        if (outputText.isBlank()) {
+            throw new OpenAiException("OpenAI returned an empty description");
+        }
+        return outputText;
     }
 
     private Map<String, Object> requestBody(String prompt) {
-        Map<String, Object> request = new LinkedHashMap<>();
-        request.put("model", properties.model().trim());
-        request.put("input", prompt);
-
-        if (properties.model().trim().startsWith("gpt-5.6")) {
-            request.put("reasoning", Map.of("effort", "low"));
-        }
-        return request;
+        return Map.of(
+                "model", properties.model().trim(),
+                "input", prompt
+        );
     }
 
     private void validateConfiguration() {

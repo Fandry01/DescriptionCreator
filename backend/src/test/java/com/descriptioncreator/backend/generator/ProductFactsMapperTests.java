@@ -64,6 +64,7 @@ class ProductFactsMapperTests {
                 "Test product",
                 "test-product",
                 vendor,
+                "<p>Existing description</p>",
                 metafields
         );
     }

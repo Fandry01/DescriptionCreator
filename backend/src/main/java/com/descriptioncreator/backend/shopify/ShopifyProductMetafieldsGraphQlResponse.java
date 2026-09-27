@@ -15,6 +15,7 @@ public record ShopifyProductMetafieldsGraphQlResponse(
             String title,
             String handle,
             String vendor,
+            String descriptionHtml,
             Metafields metafields
     ) {
     }

@@ -12,9 +12,16 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
+                .csrf(csrf -> csrf.ignoringRequestMatchers(
+                        "/api/products/handle/*/generate-description"
+                ))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/shopify/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/api/products/handle/*/generate-description"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .build();

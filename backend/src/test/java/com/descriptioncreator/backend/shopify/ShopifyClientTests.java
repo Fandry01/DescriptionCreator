@@ -189,6 +189,7 @@ class ShopifyClientTests {
                       "title": "Test product",
                       "handle": "test-product",
                       "vendor": "Test brand",
+                      "descriptionHtml": "<p>Existing description</p>",
                       "metafields": {
                         "nodes": [
                           {

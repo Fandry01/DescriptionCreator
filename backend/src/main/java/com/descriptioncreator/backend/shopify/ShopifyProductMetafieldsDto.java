@@ -7,6 +7,7 @@ public record ShopifyProductMetafieldsDto(
         String title,
         String handle,
         String vendor,
+        String descriptionHtml,
         List<Metafield> metafields
 ) {
 

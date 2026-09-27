@@ -48,6 +48,7 @@ class ProductServiceTests {
                 "Test product",
                 "test-product",
                 "Test brand",
+                "<p>Existing description</p>",
                 List.of(new ShopifyProductMetafieldsDto.Metafield(
                         "custom",
                         "material",

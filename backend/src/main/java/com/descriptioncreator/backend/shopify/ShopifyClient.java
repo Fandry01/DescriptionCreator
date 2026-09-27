@@ -35,6 +35,7 @@ public class ShopifyClient {
                 title
                 handle
                 vendor
+                descriptionHtml
                 metafields(first: 250, after: $cursor) {
                   nodes {
                     namespace
@@ -153,6 +154,7 @@ public class ShopifyClient {
                 product.title(),
                 product.handle(),
                 product.vendor(),
+                product.descriptionHtml(),
                 List.copyOf(metafields)
         ));
     }
