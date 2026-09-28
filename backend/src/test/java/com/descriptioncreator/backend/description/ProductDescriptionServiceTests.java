@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -85,6 +87,95 @@ class ProductDescriptionServiceTests {
         assertThat(shopifyClient.published).isFalse();
     }
 
+    @Test
+    void publishesEscapedSingleParagraphAfterRefetchingCurrentDescription() {
+        TrackingShopifyClient shopifyClient = new TrackingShopifyClient(Optional.of(product()));
+        TrackingDescriptionGenerator generator =
+                new TrackingDescriptionGenerator("Must not be generated", null);
+        ProductDescriptionService service = new ProductDescriptionService(
+                shopifyClient,
+                new TrackingProductFactsMapper(facts()),
+                generator
+        );
+
+        PublishDescriptionResponse response = service.publishDescription(
+                "jackie-1961",
+                new PublishDescriptionRequest(
+                        "  Elegant <bag> & \"icon\".\n  Polished choice.  ",
+                        "<p>Existing description</p>"
+                )
+        );
+
+        String expectedHtml = "<p>Elegant &lt;bag&gt; &amp; &quot;icon&quot;. Polished choice.</p>";
+        assertThat(response).isEqualTo(new PublishDescriptionResponse(
+                "gid://shopify/Product/1",
+                "jackie-1961",
+                expectedHtml
+        ));
+        assertThat(shopifyClient.events).containsExactly("fetch", "update");
+        assertThat(shopifyClient.updateCount).isEqualTo(1);
+        assertThat(shopifyClient.updatedProductId).isEqualTo("gid://shopify/Product/1");
+        assertThat(shopifyClient.updatedDescriptionHtml).isEqualTo(expectedHtml);
+        assertThat(generator.title).isNull();
+    }
+
+    @Test
+    void rejectsBlankApprovedDescriptionWithoutUpdatingShopify() {
+        TrackingShopifyClient shopifyClient = new TrackingShopifyClient(Optional.of(product()));
+        ProductDescriptionService service = new ProductDescriptionService(
+                shopifyClient,
+                new TrackingProductFactsMapper(facts()),
+                new TrackingDescriptionGenerator("Must not be generated", null)
+        );
+
+        assertThatThrownBy(() -> service.publishDescription(
+                "jackie-1961",
+                new PublishDescriptionRequest("  \n ", "<p>Existing description</p>")
+        )).isInstanceOfSatisfying(ResponseStatusException.class, exception ->
+                assertThat(exception.getStatusCode().value()).isEqualTo(400)
+        );
+        assertThat(shopifyClient.events).containsExactly("fetch");
+        assertThat(shopifyClient.updateCount).isZero();
+    }
+
+    @Test
+    void returnsConflictWhenShopifyDescriptionChangedAndDoesNotPublish() {
+        TrackingShopifyClient shopifyClient = new TrackingShopifyClient(Optional.of(product()));
+        TrackingDescriptionGenerator generator =
+                new TrackingDescriptionGenerator("Must not be generated", null);
+        ProductDescriptionService service = new ProductDescriptionService(
+                shopifyClient,
+                new TrackingProductFactsMapper(facts()),
+                generator
+        );
+
+        assertThatThrownBy(() -> service.publishDescription(
+                "jackie-1961",
+                new PublishDescriptionRequest("Approved description", "<p>Older description</p>")
+        )).isInstanceOfSatisfying(ResponseStatusException.class, exception -> {
+            assertThat(exception.getStatusCode().value()).isEqualTo(409);
+            assertThat(exception.getReason())
+                    .isEqualTo("The Shopify description changed after the draft was generated");
+        });
+        assertThat(shopifyClient.events).containsExactly("fetch");
+        assertThat(shopifyClient.updateCount).isZero();
+        assertThat(generator.title).isNull();
+    }
+
+    @Test
+    void shopifyClientExposesNoInventoryOrVariantUpdatePath() {
+        List<String> updateMethods = Arrays.stream(ShopifyClient.class.getDeclaredMethods())
+                .map(method -> method.getName())
+                .filter(name -> name.startsWith("update"))
+                .toList();
+
+        assertThat(updateMethods).containsExactly("updateProductDescription");
+        assertThat(updateMethods).noneMatch(name ->
+                name.toLowerCase().contains("inventory")
+                        || name.toLowerCase().contains("variant")
+        );
+    }
+
     private ShopifyProductMetafieldsDto product() {
         return new ShopifyProductMetafieldsDto(
                 "gid://shopify/Product/1",
@@ -106,8 +197,12 @@ class ProductDescriptionServiceTests {
     private static class TrackingShopifyClient extends ShopifyClient {
 
         private final Optional<ShopifyProductMetafieldsDto> product;
+        private final List<String> events = new ArrayList<>();
         private String fetchedHandle;
         private boolean published;
+        private int updateCount;
+        private String updatedProductId;
+        private String updatedDescriptionHtml;
 
         TrackingShopifyClient(Optional<ShopifyProductMetafieldsDto> product) {
             super(RestClient.create(), new ShopifyTokenStore());
@@ -116,13 +211,18 @@ class ProductDescriptionServiceTests {
 
         @Override
         public Optional<ShopifyProductMetafieldsDto> fetchProductMetafieldsByHandle(String handle) {
+            events.add("fetch");
             fetchedHandle = handle;
             return product;
         }
 
         @Override
         public void updateProductDescription(String productId, String descriptionHtml) {
+            events.add("update");
             published = true;
+            updateCount++;
+            updatedProductId = productId;
+            updatedDescriptionHtml = descriptionHtml;
         }
     }
 

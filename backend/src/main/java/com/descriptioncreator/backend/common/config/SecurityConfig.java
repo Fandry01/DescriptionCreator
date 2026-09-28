@@ -13,14 +13,16 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(csrf -> csrf.ignoringRequestMatchers(
-                        "/api/products/handle/*/generate-description"
+                        "/api/products/handle/*/generate-description",
+                        "/api/products/handle/*/publish-description"
                 ))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/api/shopify/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
                         .requestMatchers(
                                 HttpMethod.POST,
-                                "/api/products/handle/*/generate-description"
+                                "/api/products/handle/*/generate-description",
+                                "/api/products/handle/*/publish-description"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
