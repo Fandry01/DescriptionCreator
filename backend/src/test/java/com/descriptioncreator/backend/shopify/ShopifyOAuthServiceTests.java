@@ -36,7 +36,7 @@ class ShopifyOAuthServiceTests {
     void createsAuthorizationUrlAndExchangesValidCallback() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        ShopifyTokenStore tokenStore = new ShopifyTokenStore();
+        ShopifyTokenStore tokenStore = TestShopifyTokenStores.create();
         ShopifyOAuthService service = service(builder.build(), tokenStore);
 
         String authorizationUrl = service.createAuthorizationUrl();
@@ -78,7 +78,7 @@ class ShopifyOAuthServiceTests {
 
     @Test
     void rejectsReusedState() {
-        ShopifyOAuthService service = service(RestClient.create(), new ShopifyTokenStore());
+        ShopifyOAuthService service = service(RestClient.create(), TestShopifyTokenStores.create());
         String state = UriComponentsBuilder.fromUriString(service.createAuthorizationUrl())
                 .build()
                 .getQueryParams()
@@ -100,7 +100,7 @@ class ShopifyOAuthServiceTests {
 
     @Test
     void rejectsUnexpectedShopBeforeTokenExchange() {
-        ShopifyOAuthService service = service(RestClient.create(), new ShopifyTokenStore());
+        ShopifyOAuthService service = service(RestClient.create(), TestShopifyTokenStores.create());
         String state = UriComponentsBuilder.fromUriString(service.createAuthorizationUrl())
                 .build()
                 .getQueryParams()

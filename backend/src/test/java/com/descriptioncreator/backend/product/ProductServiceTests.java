@@ -4,6 +4,7 @@ import com.descriptioncreator.backend.shopify.ShopifyClient;
 import com.descriptioncreator.backend.shopify.ShopifyProductDto;
 import com.descriptioncreator.backend.shopify.ShopifyProductMetafieldsDto;
 import com.descriptioncreator.backend.shopify.ShopifyTokenStore;
+import com.descriptioncreator.backend.shopify.TestShopifyTokenStores;
 import org.junit.jupiter.api.Test;
 
 import java.time.OffsetDateTime;
@@ -73,7 +74,7 @@ class ProductServiceTests {
     private ProductService productServiceWith(List<ShopifyProductDto> products) {
         ShopifyClient shopifyClient = new ShopifyClient(
                 org.springframework.web.client.RestClient.create(),
-                new ShopifyTokenStore()
+                TestShopifyTokenStores.create()
         ) {
             @Override
             public List<ShopifyProductDto> fetchProducts() {
@@ -88,7 +89,7 @@ class ProductServiceTests {
     ) {
         return new ShopifyClient(
                 org.springframework.web.client.RestClient.create(),
-                new ShopifyTokenStore()
+                TestShopifyTokenStores.create()
         ) {
             @Override
             public Optional<ShopifyProductMetafieldsDto> fetchProductMetafieldsByHandle(String handle) {

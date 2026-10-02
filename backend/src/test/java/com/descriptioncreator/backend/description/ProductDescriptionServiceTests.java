@@ -9,6 +9,7 @@ import com.descriptioncreator.backend.openai.OpenAiException;
 import com.descriptioncreator.backend.shopify.ShopifyClient;
 import com.descriptioncreator.backend.shopify.ShopifyProductMetafieldsDto;
 import com.descriptioncreator.backend.shopify.ShopifyTokenStore;
+import com.descriptioncreator.backend.shopify.TestShopifyTokenStores;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
@@ -205,7 +206,7 @@ class ProductDescriptionServiceTests {
         private String updatedDescriptionHtml;
 
         TrackingShopifyClient(Optional<ShopifyProductMetafieldsDto> product) {
-            super(RestClient.create(), new ShopifyTokenStore());
+            super(RestClient.create(), TestShopifyTokenStores.create());
             this.product = product;
         }
 

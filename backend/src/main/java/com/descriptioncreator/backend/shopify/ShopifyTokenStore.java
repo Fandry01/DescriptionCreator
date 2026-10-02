@@ -1,29 +1,62 @@
 package com.descriptioncreator.backend.shopify;
 
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.Locale;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Component
 public class ShopifyTokenStore {
 
-    private final AtomicReference<Connection> connection = new AtomicReference<>();
+    private final ShopifyConnectionRepository repository;
+    private final ShopifyProperties properties;
 
+    public ShopifyTokenStore(
+            ShopifyConnectionRepository repository,
+            ShopifyProperties properties
+    ) {
+        this.repository = repository;
+        this.properties = properties;
+    }
+
+    @Transactional
     public void store(String shop, String accessToken) {
-        connection.set(new Connection(shop, accessToken));
+        String normalizedShop = normalizeShop(shop);
+        Instant now = Instant.now();
+        ShopifyConnectionEntity connection = repository.findByShopDomain(normalizedShop)
+                .map(existing -> {
+                    existing.updateAccessToken(accessToken, now);
+                    return existing;
+                })
+                .orElseGet(() -> new ShopifyConnectionEntity(
+                        normalizedShop,
+                        accessToken,
+                        now
+                ));
+        repository.save(connection);
     }
 
+    @Transactional(readOnly = true)
     public Optional<String> accessToken() {
-        return Optional.ofNullable(connection.get()).map(Connection::accessToken);
+        return repository.findByShopDomain(normalizeShop(properties.shopDomain()))
+                .map(ShopifyConnectionEntity::getAccessToken)
+                .filter(token -> !token.isBlank());
     }
 
+    @Transactional(readOnly = true)
     public Status status(String configuredShop) {
-        Connection current = connection.get();
-        return new Status(current != null, current == null ? configuredShop : current.shop());
+        String normalizedShop = normalizeShop(configuredShop);
+        boolean connected = repository.findByShopDomain(normalizedShop)
+                .map(ShopifyConnectionEntity::getAccessToken)
+                .filter(token -> !token.isBlank())
+                .isPresent();
+        return new Status(connected, normalizedShop);
     }
 
-    private record Connection(String shop, String accessToken) {
+    private String normalizeShop(String shop) {
+        return shop == null ? "" : shop.trim().toLowerCase(Locale.ROOT);
     }
 
     public record Status(boolean connected, String shop) {

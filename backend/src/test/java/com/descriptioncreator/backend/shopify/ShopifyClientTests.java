@@ -34,7 +34,7 @@ class ShopifyClientTests {
                 "http://localhost:8080/api/shopify/callback"
         );
         RestClient restClient = new ShopifyConfig().buildShopifyRestClient(builder, properties);
-        ShopifyTokenStore tokenStore = new ShopifyTokenStore();
+        ShopifyTokenStore tokenStore = TestShopifyTokenStores.create();
         tokenStore.store("example.myshopify.com", "test-token");
         ShopifyClient client = new ShopifyClient(restClient, tokenStore);
 
@@ -79,7 +79,7 @@ class ShopifyClientTests {
                 "2026-07",
                 "http://localhost:8080/api/shopify/callback"
         );
-        ShopifyTokenStore tokenStore = new ShopifyTokenStore();
+        ShopifyTokenStore tokenStore = TestShopifyTokenStores.create();
         tokenStore.store("example.myshopify.com", "test-token");
         ShopifyClient client = new ShopifyClient(
                 new ShopifyConfig().buildShopifyRestClient(builder, properties),
@@ -133,7 +133,7 @@ class ShopifyClientTests {
                 "2026-07",
                 "http://localhost:8080/api/shopify/callback"
         );
-        ShopifyTokenStore tokenStore = new ShopifyTokenStore();
+        ShopifyTokenStore tokenStore = TestShopifyTokenStores.create();
         tokenStore.store("example.myshopify.com", "test-token");
         ShopifyClient client = new ShopifyClient(
                 new ShopifyConfig().buildShopifyRestClient(builder, properties),
