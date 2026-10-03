@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { getMissingDescriptionProducts } from './api/descriptionApi'
+import { getProducts } from './api/descriptionApi'
 import { ProductEditor } from './components/ProductEditor'
 import { ProductList } from './components/ProductList'
 import type { ProductSummary } from './types/product'
 import './App.css'
 
 function App() {
+  const [productFilter, setProductFilter] = useState<'missing' | 'all'>('missing')
   const [products, setProducts] = useState<ProductSummary[]>([])
   const [selectedProduct, setSelectedProduct] =
     useState<ProductSummary | null>(null)
@@ -17,19 +18,19 @@ function App() {
     setError(null)
 
     try {
-      setProducts(await getMissingDescriptionProducts())
+      setProducts(await getProducts(productFilter === 'missing'))
     } catch {
       setError('We could not connect to Shopify. Check the backend and try again.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [productFilter])
 
   useEffect(() => {
     const controller = new AbortController()
     let active = true
 
-    getMissingDescriptionProducts(controller.signal)
+    getProducts(productFilter === 'missing', controller.signal)
       .then((loadedProducts) => {
         if (active) setProducts(loadedProducts)
       })
@@ -46,12 +47,22 @@ function App() {
       active = false
       controller.abort()
     }
-  }, [])
+  }, [productFilter])
 
-  function handlePublished(handle: string) {
-    setProducts((current) =>
-      current.filter((product) => product.handle !== handle),
+  function handlePublished(handle: string, publishedDescriptionHtml: string) {
+    setProducts((current) => productFilter === 'missing'
+      ? current.filter((product) => product.handle !== handle)
+      : current.map((product) => product.handle === handle
+        ? { ...product, descriptionHtml: publishedDescriptionHtml }
+        : product),
     )
+  }
+
+  function handleProductFilterChange(filter: 'missing' | 'all') {
+    if (filter === productFilter) return
+    setProductFilter(filter)
+    setLoading(true)
+    setError(null)
   }
 
   return (
@@ -82,7 +93,9 @@ function App() {
         ) : (
           <ProductList
             error={error}
+            filter={productFilter}
             loading={loading}
+            onFilterChange={handleProductFilterChange}
             onRetry={loadProducts}
             onSelect={setSelectedProduct}
             products={products}

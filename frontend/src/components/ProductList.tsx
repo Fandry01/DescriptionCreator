@@ -2,11 +2,19 @@ import { useMemo, useState } from 'react'
 import type { ProductSummary } from '../types/product'
 
 interface ProductListProps {
+  filter: 'missing' | 'all'
   products: ProductSummary[]
   loading: boolean
   error: string | null
   onRetry: () => void
+  onFilterChange: (filter: 'missing' | 'all') => void
   onSelect: (product: ProductSummary) => void
+}
+
+function isDescriptionMissing(descriptionHtml: string | null): boolean {
+  if (!descriptionHtml?.trim()) return true
+  const document = new DOMParser().parseFromString(descriptionHtml, 'text/html')
+  return !(document.body.textContent ?? '').replace(/\u00a0/g, ' ').trim()
 }
 
 const dateFormatter = new Intl.DateTimeFormat('en-GB', {
@@ -21,10 +29,12 @@ function formatDate(value: string): string {
 }
 
 export function ProductList({
+  filter,
   products,
   loading,
   error,
   onRetry,
+  onFilterChange,
   onSelect,
 }: ProductListProps) {
   const [search, setSearch] = useState('')
@@ -46,8 +56,9 @@ export function ProductList({
           <p className="eyebrow">Catalogue workspace</p>
           <h1 id="products-heading">Product descriptions</h1>
           <p className="page-subtitle">
-            Create polished descriptions for products that are currently missing
-            them in Shopify.
+            {filter === 'missing'
+              ? 'Create polished descriptions for products that are currently missing them in Shopify.'
+              : 'Open any recent Shopify product to create copy or inspect its version history.'}
           </p>
         </div>
         {!loading && !error && products.length > 0 && (
@@ -55,6 +66,25 @@ export function ProductList({
             {products.length} {products.length === 1 ? 'product' : 'products'}
           </span>
         )}
+      </div>
+
+      <div className="product-filter" aria-label="Filter products" role="group">
+        <button
+          aria-pressed={filter === 'missing'}
+          className={filter === 'missing' ? 'active' : ''}
+          onClick={() => onFilterChange('missing')}
+          type="button"
+        >
+          Missing descriptions
+        </button>
+        <button
+          aria-pressed={filter === 'all'}
+          className={filter === 'all' ? 'active' : ''}
+          onClick={() => onFilterChange('all')}
+          type="button"
+        >
+          All products
+        </button>
       </div>
 
       {loading && (
@@ -117,8 +147,10 @@ export function ProductList({
                 <span>Status</span>
                 <span />
               </div>
-              {filteredProducts.map((product) => (
-                <article className="product-row" key={product.id}>
+              {filteredProducts.map((product) => {
+                const missingDescription = isDescriptionMissing(product.descriptionHtml)
+
+                return <article className="product-row" key={product.id}>
                   <div className="product-identity">
                     <h2>{product.title}</h2>
                     <p>/{product.handle}</p>
@@ -130,9 +162,9 @@ export function ProductList({
                     </time>
                   </div>
                   <div>
-                    <span className="status-badge">
+                    <span className={`status-badge ${missingDescription ? '' : 'status-badge-available'}`}>
                       <span aria-hidden="true" />
-                      Missing description
+                      {missingDescription ? 'Missing description' : 'Description available'}
                     </span>
                   </div>
                   <button
@@ -140,10 +172,10 @@ export function ProductList({
                     onClick={() => onSelect(product)}
                     type="button"
                   >
-                    Create description
+                    {missingDescription ? 'Create description' : 'Open product'}
                   </button>
                 </article>
-              ))}
+              })}
             </div>
           )}
         </>

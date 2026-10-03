@@ -43,12 +43,14 @@ async function requestJson<T>(
   }
 }
 
-export function getMissingDescriptionProducts(
+export function getProducts(
+  missingDescription: boolean,
   signal?: AbortSignal,
 ): Promise<ProductSummary[]> {
-  return requestJson<ProductSummary[]>('/api/products?missingDescription=true', {
-    signal,
-  })
+  return requestJson<ProductSummary[]>(
+    `/api/products?missingDescription=${missingDescription}`,
+    { signal },
+  )
 }
 
 export function generateProductDescription(
@@ -104,7 +106,7 @@ export async function getProductCurrentState(
   handle: string,
   signal?: AbortSignal,
 ): Promise<ProductSummary> {
-  const products = await requestJson<ProductSummary[]>('/api/products', { signal })
+  const products = await getProducts(false, signal)
   const product = products.find((candidate) => candidate.handle === handle)
 
   if (!product) {

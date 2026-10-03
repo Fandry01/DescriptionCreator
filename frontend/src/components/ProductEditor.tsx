@@ -19,7 +19,7 @@ import { VersionHistory } from './VersionHistory'
 interface ProductEditorProps {
   product: ProductSummary
   onBack: () => void
-  onPublished: (handle: string) => void
+  onPublished: (handle: string, publishedDescriptionHtml: string) => void
 }
 
 function htmlToPlainText(html: string | null): string {
@@ -74,57 +74,45 @@ export function ProductEditor({
     }
   }, [product.handle])
 
-  const loadDraft = useCallback(async () => {
-    setGenerating(true)
-    setGenerationError(null)
-    setPublishError(null)
-    setConflict(false)
-    setDraft(null)
-
+  const loadDraft = useCallback(async (signal?: AbortSignal) => {
     try {
-      const generatedDraft = await generateProductDescription(product.handle)
+      const generatedDraft = await generateProductDescription(product.handle, signal)
+      if (signal?.aborted) return
       setDraft(generatedDraft)
       setDescription(generatedDraft.generatedDescription)
       setCurrentDescriptionHtml(generatedDraft.existingDescriptionHtml)
       setCurrentDescriptionKnown(true)
       setPublished(null)
     } catch {
+      if (signal?.aborted) return
       setGenerationError(
         'A description could not be generated. Please try again.',
       )
     } finally {
-      setGenerating(false)
+      if (!signal?.aborted) setGenerating(false)
     }
   }, [product.handle])
+
+  function retryDraft() {
+    setGenerating(true)
+    setGenerationError(null)
+    setPublishError(null)
+    setConflict(false)
+    setDraft(null)
+    void loadDraft()
+  }
 
   useEffect(() => {
     const controller = new AbortController()
-    let active = true
-
-    generateProductDescription(product.handle, controller.signal)
-      .then((generatedDraft) => {
-        if (!active) return
-        setDraft(generatedDraft)
-        setDescription(generatedDraft.generatedDescription)
-        setCurrentDescriptionHtml(generatedDraft.existingDescriptionHtml)
-        setCurrentDescriptionKnown(true)
-      })
-      .catch(() => {
-        if (active) {
-          setGenerationError(
-            'A description could not be generated. Please try again.',
-          )
-        }
-      })
-      .finally(() => {
-        if (active) setGenerating(false)
-      })
+    const loadTimer = window.setTimeout(() => {
+      void loadDraft(controller.signal)
+    }, 0)
 
     return () => {
-      active = false
+      window.clearTimeout(loadTimer)
       controller.abort()
     }
-  }, [product.handle])
+  }, [loadDraft])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -172,7 +160,7 @@ export function ProductEditor({
       setPublished(result)
       setCurrentDescriptionHtml(result.publishedDescriptionHtml)
       setCurrentDescriptionKnown(true)
-      onPublished(draft.handle)
+      onPublished(draft.handle, result.publishedDescriptionHtml)
       void loadHistory()
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
@@ -269,7 +257,7 @@ export function ProductEditor({
             <h2>Draft generation failed</h2>
             <p>{generationError}</p>
           </div>
-          <button className="button button-secondary" onClick={loadDraft} type="button">
+          <button className="button button-secondary" onClick={retryDraft} type="button">
             Try again
           </button>
         </div>
@@ -345,7 +333,7 @@ export function ProductEditor({
                   Generate a new draft before publishing.
                 </p>
               </div>
-              <button className="button button-secondary" onClick={loadDraft} type="button">
+              <button className="button button-secondary" onClick={retryDraft} type="button">
                 Generate new draft
               </button>
             </div>
