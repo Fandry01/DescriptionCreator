@@ -13,7 +13,12 @@ import com.descriptioncreator.backend.shopify.TestShopifyTokenStores;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.Instant;
+import java.lang.reflect.Proxy;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -33,7 +38,7 @@ class ProductDescriptionServiceTests {
         TrackingDescriptionGenerator generator =
                 new TrackingDescriptionGenerator("Generated draft", null);
         ProductDescriptionService service =
-                new ProductDescriptionService(shopifyClient, factsMapper, generator);
+                new ProductDescriptionService(shopifyClient, factsMapper, generator, repository());
 
         ProductDescriptionDraftResponse response = service.generateDraft("jackie-1961");
 
@@ -61,7 +66,7 @@ class ProductDescriptionServiceTests {
         TrackingDescriptionGenerator generator =
                 new TrackingDescriptionGenerator("Generated draft", null);
         ProductDescriptionService service =
-                new ProductDescriptionService(shopifyClient, factsMapper, generator);
+                new ProductDescriptionService(shopifyClient, factsMapper, generator, repository());
 
         assertThatThrownBy(() -> service.generateDraft("missing"))
                 .isInstanceOfSatisfying(ResponseStatusException.class, exception ->
@@ -81,7 +86,7 @@ class ProductDescriptionServiceTests {
         TrackingProductFactsMapper factsMapper = new TrackingProductFactsMapper(facts);
         TrackingDescriptionGenerator generator = new TrackingDescriptionGenerator(null, failure);
         ProductDescriptionService service =
-                new ProductDescriptionService(shopifyClient, factsMapper, generator);
+                new ProductDescriptionService(shopifyClient, factsMapper, generator, repository());
 
         assertThatThrownBy(() -> service.generateDraft("jackie-1961"))
                 .isSameAs(failure);
@@ -93,10 +98,12 @@ class ProductDescriptionServiceTests {
         TrackingShopifyClient shopifyClient = new TrackingShopifyClient(Optional.of(product()));
         TrackingDescriptionGenerator generator =
                 new TrackingDescriptionGenerator("Must not be generated", null);
+        TrackingDescriptionVersionRepository history = new TrackingDescriptionVersionRepository();
         ProductDescriptionService service = new ProductDescriptionService(
                 shopifyClient,
                 new TrackingProductFactsMapper(facts()),
-                generator
+                generator,
+                history.repository
         );
 
         PublishDescriptionResponse response = service.publishDescription(
@@ -118,6 +125,7 @@ class ProductDescriptionServiceTests {
         assertThat(shopifyClient.updatedProductId).isEqualTo("gid://shopify/Product/1");
         assertThat(shopifyClient.updatedDescriptionHtml).isEqualTo(expectedHtml);
         assertThat(generator.title).isNull();
+        assertThat(history.saved).hasSize(1);
     }
 
     @Test
@@ -126,7 +134,8 @@ class ProductDescriptionServiceTests {
         ProductDescriptionService service = new ProductDescriptionService(
                 shopifyClient,
                 new TrackingProductFactsMapper(facts()),
-                new TrackingDescriptionGenerator("Must not be generated", null)
+                new TrackingDescriptionGenerator("Must not be generated", null),
+                repository()
         );
 
         assertThatThrownBy(() -> service.publishDescription(
@@ -144,10 +153,12 @@ class ProductDescriptionServiceTests {
         TrackingShopifyClient shopifyClient = new TrackingShopifyClient(Optional.of(product()));
         TrackingDescriptionGenerator generator =
                 new TrackingDescriptionGenerator("Must not be generated", null);
+        TrackingDescriptionVersionRepository history = new TrackingDescriptionVersionRepository();
         ProductDescriptionService service = new ProductDescriptionService(
                 shopifyClient,
                 new TrackingProductFactsMapper(facts()),
-                generator
+                generator,
+                history.repository
         );
 
         assertThatThrownBy(() -> service.publishDescription(
@@ -161,6 +172,131 @@ class ProductDescriptionServiceTests {
         assertThat(shopifyClient.events).containsExactly("fetch");
         assertThat(shopifyClient.updateCount).isZero();
         assertThat(generator.title).isNull();
+        assertThat(history.saved).isEmpty();
+    }
+
+    @Test
+    void recordsPublishHistoryOnlyAfterShopifyUpdateSucceeds() {
+        TrackingShopifyClient shopifyClient = new TrackingShopifyClient(Optional.of(product()));
+        TrackingDescriptionVersionRepository history = new TrackingDescriptionVersionRepository();
+        ProductDescriptionService service = service(shopifyClient, history.repository);
+
+        service.publishDescription(
+                "jackie-1961",
+                new PublishDescriptionRequest("Approved description", "<p>Existing description</p>")
+        );
+
+        assertThat(history.saved).hasSize(1);
+        DescriptionVersionEntity saved = history.saved.getFirst();
+        assertThat(saved.getProductId()).isEqualTo("gid://shopify/Product/1");
+        assertThat(saved.getHandle()).isEqualTo("jackie-1961");
+        assertThat(saved.getPreviousDescriptionHtml()).isEqualTo("<p>Existing description</p>");
+        assertThat(saved.getPublishedDescriptionHtml()).isEqualTo("<p>Approved description</p>");
+        assertThat(saved.getAction()).isEqualTo(DescriptionVersionAction.PUBLISH);
+        assertThat(saved.getRestoredFromVersionId()).isNull();
+        assertThat(shopifyClient.events).containsExactly("fetch", "update");
+    }
+
+    @Test
+    void failedShopifyPublishCreatesNoHistory() {
+        TrackingShopifyClient shopifyClient = new TrackingShopifyClient(Optional.of(product()));
+        shopifyClient.updateFailure = new IllegalStateException("Shopify unavailable");
+        TrackingDescriptionVersionRepository history = new TrackingDescriptionVersionRepository();
+        ProductDescriptionService service = service(shopifyClient, history.repository);
+
+        assertThatThrownBy(() -> service.publishDescription(
+                "jackie-1961",
+                new PublishDescriptionRequest("Approved", "<p>Existing description</p>")
+        )).isSameAs(shopifyClient.updateFailure);
+
+        assertThat(history.saved).isEmpty();
+    }
+
+    @Test
+    void restoresExactSelectedHtmlAndCreatesAppendOnlyRestoreVersion() {
+        DescriptionVersionEntity source = version(
+                41L,
+                "jackie-1961",
+                "<p>Before selected version</p>",
+                "<p>Selected historic description</p>"
+        );
+        TrackingShopifyClient shopifyClient = new TrackingShopifyClient(Optional.of(product()));
+        TrackingDescriptionVersionRepository history = new TrackingDescriptionVersionRepository();
+        history.addExisting(source);
+        history.nextId = 42L;
+        ProductDescriptionService service = service(shopifyClient, history.repository);
+
+        RestoreDescriptionResponse response = service.restoreDescription(
+                "jackie-1961",
+                41L,
+                new RestoreDescriptionRequest("<p>Existing description</p>")
+        );
+
+        assertThat(response).isEqualTo(new RestoreDescriptionResponse(
+                "gid://shopify/Product/1",
+                "jackie-1961",
+                "<p>Selected historic description</p>",
+                41L,
+                42L
+        ));
+        assertThat(shopifyClient.updatedDescriptionHtml)
+                .isEqualTo("<p>Selected historic description</p>");
+        assertThat(history.saved).hasSize(1);
+        DescriptionVersionEntity restore = history.saved.getFirst();
+        assertThat(restore.getPreviousDescriptionHtml()).isEqualTo("<p>Existing description</p>");
+        assertThat(restore.getPublishedDescriptionHtml())
+                .isEqualTo("<p>Selected historic description</p>");
+        assertThat(restore.getAction()).isEqualTo(DescriptionVersionAction.RESTORE);
+        assertThat(restore.getRestoredFromVersionId()).isEqualTo(41L);
+    }
+
+    @Test
+    void unknownOrWrongHandleVersionReturnsNotFoundWithoutShopifyWrite() {
+        TrackingShopifyClient shopifyClient = new TrackingShopifyClient(Optional.of(product()));
+        TrackingDescriptionVersionRepository history = new TrackingDescriptionVersionRepository();
+        ProductDescriptionService service = service(shopifyClient, history.repository);
+
+        assertThatThrownBy(() -> service.restoreDescription(
+                "other-handle", 99L, new RestoreDescriptionRequest("current")
+        )).isInstanceOfSatisfying(ResponseStatusException.class, exception ->
+                assertThat(exception.getStatusCode().value()).isEqualTo(404));
+
+        assertThat(shopifyClient.events).isEmpty();
+        assertThat(history.saved).isEmpty();
+    }
+
+    @Test
+    void restoreConflictCreatesNoShopifyWriteAndNoHistory() {
+        DescriptionVersionEntity source = version(41L, "jackie-1961", "old", "selected");
+        TrackingShopifyClient shopifyClient = new TrackingShopifyClient(Optional.of(product()));
+        TrackingDescriptionVersionRepository history = new TrackingDescriptionVersionRepository();
+        history.addExisting(source);
+        ProductDescriptionService service = service(shopifyClient, history.repository);
+
+        assertThatThrownBy(() -> service.restoreDescription(
+                "jackie-1961", 41L, new RestoreDescriptionRequest("<p>stale</p>")
+        )).isInstanceOfSatisfying(ResponseStatusException.class, exception ->
+                assertThat(exception.getStatusCode().value()).isEqualTo(409));
+
+        assertThat(shopifyClient.events).containsExactly("fetch");
+        assertThat(history.saved).isEmpty();
+    }
+
+    @Test
+    void failedShopifyRestoreCreatesNoHistory() {
+        DescriptionVersionEntity source = version(41L, "jackie-1961", "old", "selected");
+        TrackingShopifyClient shopifyClient = new TrackingShopifyClient(Optional.of(product()));
+        shopifyClient.updateFailure = new IllegalStateException("Shopify unavailable");
+        TrackingDescriptionVersionRepository history = new TrackingDescriptionVersionRepository();
+        history.addExisting(source);
+        ProductDescriptionService service = service(shopifyClient, history.repository);
+
+        assertThatThrownBy(() -> service.restoreDescription(
+                "jackie-1961", 41L,
+                new RestoreDescriptionRequest("<p>Existing description</p>")
+        )).isSameAs(shopifyClient.updateFailure);
+
+        assertThat(history.saved).isEmpty();
     }
 
     @Test
@@ -195,6 +331,91 @@ class ProductDescriptionServiceTests {
         );
     }
 
+    private ProductDescriptionService service(
+            TrackingShopifyClient shopifyClient,
+            DescriptionVersionRepository repository
+    ) {
+        return new ProductDescriptionService(
+                shopifyClient,
+                new TrackingProductFactsMapper(facts()),
+                new TrackingDescriptionGenerator("Must not be generated", null),
+                repository
+        );
+    }
+
+    private DescriptionVersionRepository repository() {
+        return new TrackingDescriptionVersionRepository().repository;
+    }
+
+    private DescriptionVersionEntity version(
+            Long id,
+            String handle,
+            String previousDescriptionHtml,
+            String publishedDescriptionHtml
+    ) {
+        DescriptionVersionEntity version = new DescriptionVersionEntity(
+                "gid://shopify/Product/1",
+                handle,
+                previousDescriptionHtml,
+                publishedDescriptionHtml,
+                DescriptionVersionAction.PUBLISH,
+                null,
+                Instant.parse("2026-01-01T00:00:00Z")
+        );
+        ReflectionTestUtils.setField(version, "id", id);
+        return version;
+    }
+
+    private static class TrackingDescriptionVersionRepository {
+
+        private final List<DescriptionVersionEntity> saved = new ArrayList<>();
+        private final Map<Long, DescriptionVersionEntity> existing = new HashMap<>();
+        private long nextId = 1L;
+        private final DescriptionVersionRepository repository =
+                (DescriptionVersionRepository) Proxy.newProxyInstance(
+                        DescriptionVersionRepository.class.getClassLoader(),
+                        new Class<?>[]{DescriptionVersionRepository.class},
+                        (proxy, method, arguments) -> switch (method.getName()) {
+                            case "saveAndFlush" -> save((DescriptionVersionEntity) arguments[0]);
+                            case "findByIdAndHandle" -> find(
+                                    (Long) arguments[0],
+                                    (String) arguments[1]
+                            );
+                            case "findAllByHandleOrderByCreatedAtDescIdDesc" -> existing.values()
+                                    .stream()
+                                    .filter(version -> version.getHandle().equals(arguments[0]))
+                                    .sorted((left, right) -> {
+                                        int byCreatedAt = right.getCreatedAt()
+                                                .compareTo(left.getCreatedAt());
+                                        return byCreatedAt != 0
+                                                ? byCreatedAt
+                                                : right.getId().compareTo(left.getId());
+                                    })
+                                    .toList();
+                            case "toString" -> "TrackingDescriptionVersionRepository";
+                            default -> throw new UnsupportedOperationException(method.getName());
+                        }
+                );
+
+        private DescriptionVersionEntity save(DescriptionVersionEntity version) {
+            if (version.getId() == null) {
+                ReflectionTestUtils.setField(version, "id", nextId++);
+            }
+            saved.add(version);
+            existing.put(version.getId(), version);
+            return version;
+        }
+
+        private Optional<DescriptionVersionEntity> find(Long id, String handle) {
+            return Optional.ofNullable(existing.get(id))
+                    .filter(version -> version.getHandle().equals(handle));
+        }
+
+        private void addExisting(DescriptionVersionEntity version) {
+            existing.put(version.getId(), version);
+        }
+    }
+
     private static class TrackingShopifyClient extends ShopifyClient {
 
         private final Optional<ShopifyProductMetafieldsDto> product;
@@ -204,6 +425,7 @@ class ProductDescriptionServiceTests {
         private int updateCount;
         private String updatedProductId;
         private String updatedDescriptionHtml;
+        private RuntimeException updateFailure;
 
         TrackingShopifyClient(Optional<ShopifyProductMetafieldsDto> product) {
             super(RestClient.create(), TestShopifyTokenStores.create());
@@ -220,6 +442,9 @@ class ProductDescriptionServiceTests {
         @Override
         public void updateProductDescription(String productId, String descriptionHtml) {
             events.add("update");
+            if (updateFailure != null) {
+                throw updateFailure;
+            }
             published = true;
             updateCount++;
             updatedProductId = productId;
