@@ -640,6 +640,31 @@ h1 {
   box-shadow: 0 0 0 3px rgba(74, 12, 12, 0.08);
 }
 
+.generate-empty-state {
+  min-height: 17rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+}
+
+.generate-empty-state h3 {
+  margin: 1rem 0 0.45rem;
+  font-family: var(--serif);
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.generate-empty-state p {
+  max-width: 25rem;
+  margin-bottom: 1.25rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
 .description-count {
   display: flex;
   justify-content: flex-end;

@@ -10,6 +10,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.*;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
+import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -19,12 +20,15 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final SecurityContextRepository securityContextRepository;
     private final AppUserRepository users;
+    private final SessionAuthenticationStrategy sessionAuthenticationStrategy;
 
     public AuthController(AuthenticationManager authenticationManager,
-            SecurityContextRepository securityContextRepository, AppUserRepository users) {
+            SecurityContextRepository securityContextRepository, AppUserRepository users,
+            SessionAuthenticationStrategy sessionAuthenticationStrategy) {
         this.authenticationManager = authenticationManager;
         this.securityContextRepository = securityContextRepository;
         this.users = users;
+        this.sessionAuthenticationStrategy = sessionAuthenticationStrategy;
     }
 
     @GetMapping("/csrf")
@@ -37,6 +41,7 @@ public class AuthController {
             Authentication authentication = authenticationManager.authenticate(
                     UsernamePasswordAuthenticationToken.unauthenticated(
                             AppUserEntity.normalizeEmail(request.email()), request.password()));
+            sessionAuthenticationStrategy.onAuthentication(authentication, servletRequest, servletResponse);
             SecurityContext context = SecurityContextHolder.createEmptyContext();
             context.setAuthentication(authentication);
             SecurityContextHolder.setContext(context);

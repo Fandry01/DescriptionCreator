@@ -41,13 +41,19 @@ class AuthIntegrationTests {
     }
 
     @Test void validLoginPersistsSessionAndLogoutInvalidatesIt() throws Exception {
+        org.springframework.mock.web.MockHttpSession preLoginSession =
+                new org.springframework.mock.web.MockHttpSession();
+        String preLoginSessionId = preLoginSession.getId();
         HttpSession session = (HttpSession) mvc.perform(post("/api/auth/login").with(csrf())
+                        .session(preLoginSession)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\" USER@example.com \",\"password\":\"safe-password\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authenticated").value(true))
                 .andExpect(jsonPath("$.email").value("user@example.com"))
                 .andReturn().getRequest().getSession(false);
+
+        assertThat(session.getId()).isNotEqualTo(preLoginSessionId);
 
         mvc.perform(get("/api/auth/me").session((org.springframework.mock.web.MockHttpSession) session))
                 .andExpect(status().isOk())
@@ -70,6 +76,7 @@ class AuthIntegrationTests {
     }
 
     @Test void shopifyOauthEntryPointsRemainPublicWhileStatusIsProtected() throws Exception {
+        mvc.perform(get("/api/shopify/auth")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/shopify/status")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/shopify/callback")).andExpect(result ->
                 assertThat(result.getResponse().getStatus()).isNotEqualTo(401));

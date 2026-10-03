@@ -13,6 +13,8 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.authentication.session.ChangeSessionIdAuthenticationStrategy;
+import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
 
 @Configuration
 public class SecurityConfig {
@@ -24,7 +26,7 @@ public class SecurityConfig {
                 .csrf(configurer -> configurer.csrfTokenRepository(csrf))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/error", "/api/auth/login", "/api/auth/csrf").permitAll()
-                        .requestMatchers("/api/shopify/auth", "/api/shopify/callback").permitAll()
+                        .requestMatchers("/api/shopify/callback").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exceptions -> exceptions
@@ -40,5 +42,8 @@ public class SecurityConfig {
     }
     @Bean SecurityContextRepository securityContextRepository() {
         return new HttpSessionSecurityContextRepository();
+    }
+    @Bean SessionAuthenticationStrategy sessionAuthenticationStrategy() {
+        return new ChangeSessionIdAuthenticationStrategy();
     }
 }

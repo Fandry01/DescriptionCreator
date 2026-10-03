@@ -42,7 +42,7 @@ export function ProductEditor({
 }: ProductEditorProps) {
   const [draft, setDraft] = useState<ProductDescriptionDraft | null>(null)
   const [description, setDescription] = useState('')
-  const [generating, setGenerating] = useState(true)
+  const [generating, setGenerating] = useState(false)
   const [generationError, setGenerationError] = useState<string | null>(null)
   const [publishing, setPublishing] = useState(false)
   const [publishError, setPublishError] = useState<string | null>(null)
@@ -50,8 +50,8 @@ export function ProductEditor({
   const [published, setPublished] =
     useState<PublishDescriptionResponse | null>(null)
   const [currentDescriptionHtml, setCurrentDescriptionHtml] =
-    useState<string | null>(null)
-  const [currentDescriptionKnown, setCurrentDescriptionKnown] = useState(false)
+    useState<string | null>(product.descriptionHtml)
+  const [currentDescriptionKnown, setCurrentDescriptionKnown] = useState(true)
   const [history, setHistory] = useState<DescriptionVersion[]>([])
   const [historyLoading, setHistoryLoading] = useState(true)
   const [historyError, setHistoryError] = useState<string | null>(null)
@@ -85,6 +85,7 @@ export function ProductEditor({
       setCurrentDescriptionHtml(generatedDraft.existingDescriptionHtml)
       setCurrentDescriptionKnown(true)
       setPublished(null)
+      setConflict(false)
       onGenerated()
     } catch (error) {
       if (signal?.aborted) return
@@ -96,26 +97,12 @@ export function ProductEditor({
     }
   }, [onGenerated, product.handle])
 
-  function retryDraft() {
+  function generateDraft() {
     setGenerating(true)
     setGenerationError(null)
     setPublishError(null)
-    setConflict(false)
-    setDraft(null)
     void loadDraft()
   }
-
-  useEffect(() => {
-    const controller = new AbortController()
-    const loadTimer = window.setTimeout(() => {
-      void loadDraft(controller.signal)
-    }, 0)
-
-    return () => {
-      window.clearTimeout(loadTimer)
-      controller.abort()
-    }
-  }, [loadDraft])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -246,28 +233,19 @@ export function ProductEditor({
         <p>Review every detail and edit the draft before publishing.</p>
       </div>
 
-      {generating && (
-        <div className="generating-panel" role="status">
-          <span className="spinner spinner-large" aria-hidden="true" />
-          <h2>Creating a new description</h2>
-          <p>Writing a polished draft from the available product details.</p>
-        </div>
-      )}
-
-      {!generating && generationError && (
+      {generationError && (
         <div className="state-panel state-panel-error" role="alert">
           <div>
             <h2>Draft generation failed</h2>
             <p>{generationError}</p>
           </div>
-          <button className="button button-secondary" onClick={retryDraft} type="button">
+          <button className="button button-secondary" onClick={generateDraft} type="button">
             Try again
           </button>
         </div>
       )}
 
-      {!generating && draft && (
-        <>
+      {draft && (
           <section className="facts-section" aria-labelledby="facts-heading">
             <div className="section-heading-inline">
               <div>
@@ -278,8 +256,9 @@ export function ProductEditor({
             </div>
             <ProductFacts facts={draft.facts} />
           </section>
+      )}
 
-          <div className="comparison-grid">
+      <div className="comparison-grid">
             <section className="comparison-panel" aria-labelledby="existing-heading">
               <div className="comparison-heading">
                 <div>
@@ -301,7 +280,7 @@ export function ProductEditor({
                 </div>
                 <span className="editable-label">Editable</span>
               </div>
-              <label className="editor-field">
+              {draft ? <><label className="editor-field">
                 <span className="sr-only">New product description</span>
                 <textarea
                   aria-describedby="description-count"
@@ -313,7 +292,21 @@ export function ProductEditor({
               <div className="description-count" id="description-count">
                 <span>{wordCount} {wordCount === 1 ? 'word' : 'words'}</span>
                 <span>{description.length} characters</span>
-              </div>
+              </div></> : (
+                <div className="generate-empty-state">
+                  {generating ? <>
+                    <span className="spinner spinner-large" aria-hidden="true" />
+                    <h3>Creating a new description</h3>
+                    <p>Writing a polished draft from the available product details.</p>
+                  </> : <>
+                    <h3>Ready to create a draft?</h3>
+                    <p>Generation only starts when you choose it and will count towards monthly usage.</p>
+                    <button className="button button-primary" onClick={generateDraft} type="button">
+                      Generate description
+                    </button>
+                  </>}
+                </div>
+              )}
             </section>
           </div>
 
@@ -336,7 +329,7 @@ export function ProductEditor({
                   Generate a new draft before publishing.
                 </p>
               </div>
-              <button className="button button-secondary" onClick={retryDraft} type="button">
+              <button className="button button-secondary" onClick={generateDraft} type="button">
                 Generate new draft
               </button>
             </div>
@@ -348,7 +341,7 @@ export function ProductEditor({
             </div>
           )}
 
-          <div className="editor-actions">
+          {draft && <div className="editor-actions">
             <button className="button button-quiet" onClick={onBack} type="button">
               Back without publishing
             </button>
@@ -364,7 +357,7 @@ export function ProductEditor({
                 'Publish description'
               )}
             </button>
-          </div>
+          </div>}
 
           {restoreSuccess && (
             <div className="success-banner" role="status">
@@ -388,8 +381,6 @@ export function ProductEditor({
             restoringVersionId={restoringVersionId}
             versions={history}
           />
-        </>
-      )}
     </section>
   )
 }
