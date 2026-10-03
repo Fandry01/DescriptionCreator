@@ -43,3 +43,28 @@ export interface PublishDescriptionResponse {
   handle: string
   publishedDescriptionHtml: string
 }
+
+export type DescriptionVersionAction = 'PUBLISH' | 'RESTORE'
+
+export interface DescriptionVersion {
+  id: number
+  productId: string
+  handle: string
+  previousDescriptionHtml: string | null
+  publishedDescriptionHtml: string
+  action: DescriptionVersionAction
+  restoredFromVersionId: number | null
+  createdAt: string
+}
+
+export interface RestoreDescriptionRequest {
+  expectedExistingDescriptionHtml: string | null
+}
+
+export interface RestoreDescriptionResponse {
+  productId: string
+  handle: string
+  publishedDescriptionHtml: string
+  restoredFromVersionId: number
+  newVersionId: number
+}

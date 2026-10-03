@@ -1,8 +1,11 @@
 import type {
+  DescriptionVersion,
   ProductDescriptionDraft,
   ProductSummary,
   PublishDescriptionRequest,
   PublishDescriptionResponse,
+  RestoreDescriptionRequest,
+  RestoreDescriptionResponse,
 } from '../types/product'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
@@ -70,4 +73,43 @@ export function publishProductDescription(
       body: JSON.stringify(request),
     },
   )
+}
+
+export function getDescriptionHistory(
+  handle: string,
+  signal?: AbortSignal,
+): Promise<DescriptionVersion[]> {
+  return requestJson<DescriptionVersion[]>(
+    `/api/products/handle/${encodeURIComponent(handle)}/description-history`,
+    { signal },
+  )
+}
+
+export function restoreDescriptionVersion(
+  handle: string,
+  versionId: number,
+  request: RestoreDescriptionRequest,
+): Promise<RestoreDescriptionResponse> {
+  return requestJson<RestoreDescriptionResponse>(
+    `/api/products/handle/${encodeURIComponent(handle)}/description-history/${versionId}/restore`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  )
+}
+
+export async function getProductCurrentState(
+  handle: string,
+  signal?: AbortSignal,
+): Promise<ProductSummary> {
+  const products = await requestJson<ProductSummary[]>('/api/products', { signal })
+  const product = products.find((candidate) => candidate.handle === handle)
+
+  if (!product) {
+    throw new ApiError(404, 'The product was not found in the current Shopify product list.')
+  }
+
+  return product
 }

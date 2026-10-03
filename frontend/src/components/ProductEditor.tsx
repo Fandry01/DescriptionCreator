@@ -2,14 +2,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ApiError,
   generateProductDescription,
+  getDescriptionHistory,
+  getProductCurrentState,
   publishProductDescription,
+  restoreDescriptionVersion,
 } from '../api/descriptionApi'
 import type {
+  DescriptionVersion,
   ProductDescriptionDraft,
   ProductSummary,
   PublishDescriptionResponse,
 } from '../types/product'
 import { ProductFacts } from './ProductFacts'
+import { VersionHistory } from './VersionHistory'
 
 interface ProductEditorProps {
   product: ProductSummary
@@ -42,6 +47,32 @@ export function ProductEditor({
   const [conflict, setConflict] = useState(false)
   const [published, setPublished] =
     useState<PublishDescriptionResponse | null>(null)
+  const [currentDescriptionHtml, setCurrentDescriptionHtml] =
+    useState<string | null>(null)
+  const [currentDescriptionKnown, setCurrentDescriptionKnown] = useState(false)
+  const [history, setHistory] = useState<DescriptionVersion[]>([])
+  const [historyLoading, setHistoryLoading] = useState(true)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+  const [restoringVersionId, setRestoringVersionId] = useState<number | null>(null)
+  const [restoreConflict, setRestoreConflict] = useState(false)
+  const [restoreError, setRestoreError] = useState<string | null>(null)
+  const [restoreSuccess, setRestoreSuccess] = useState<string | null>(null)
+  const [refreshingCurrent, setRefreshingCurrent] = useState(false)
+
+  const loadHistory = useCallback(async (signal?: AbortSignal) => {
+    setHistoryLoading(true)
+    setHistoryError(null)
+
+    try {
+      setHistory(await getDescriptionHistory(product.handle, signal))
+    } catch {
+      if (!signal?.aborted) {
+        setHistoryError('Version history could not be loaded. Please try again.')
+      }
+    } finally {
+      if (!signal?.aborted) setHistoryLoading(false)
+    }
+  }, [product.handle])
 
   const loadDraft = useCallback(async () => {
     setGenerating(true)
@@ -54,6 +85,9 @@ export function ProductEditor({
       const generatedDraft = await generateProductDescription(product.handle)
       setDraft(generatedDraft)
       setDescription(generatedDraft.generatedDescription)
+      setCurrentDescriptionHtml(generatedDraft.existingDescriptionHtml)
+      setCurrentDescriptionKnown(true)
+      setPublished(null)
     } catch {
       setGenerationError(
         'A description could not be generated. Please try again.',
@@ -72,6 +106,8 @@ export function ProductEditor({
         if (!active) return
         setDraft(generatedDraft)
         setDescription(generatedDraft.generatedDescription)
+        setCurrentDescriptionHtml(generatedDraft.existingDescriptionHtml)
+        setCurrentDescriptionKnown(true)
       })
       .catch(() => {
         if (active) {
@@ -90,26 +126,54 @@ export function ProductEditor({
     }
   }, [product.handle])
 
+  useEffect(() => {
+    const controller = new AbortController()
+    let active = true
+
+    getDescriptionHistory(product.handle, controller.signal)
+      .then((versions) => {
+        if (active) setHistory(versions)
+      })
+      .catch(() => {
+        if (active) {
+          setHistoryError('Version history could not be loaded. Please try again.')
+        }
+      })
+      .finally(() => {
+        if (active) setHistoryLoading(false)
+      })
+
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [product.handle])
+
   const existingDescription = useMemo(
-    () => htmlToPlainText(draft?.existingDescriptionHtml ?? null),
-    [draft?.existingDescriptionHtml],
+    () => htmlToPlainText(currentDescriptionHtml),
+    [currentDescriptionHtml],
   )
   const wordCount = useMemo(() => countWords(description), [description])
 
   async function handlePublish() {
-    if (!draft || !description.trim() || publishing) return
+    if (!draft || !description.trim() || publishing || !currentDescriptionKnown) return
 
     setPublishing(true)
     setPublishError(null)
     setConflict(false)
+    setPublished(null)
+    setRestoreSuccess(null)
 
     try {
       const result = await publishProductDescription(draft.handle, {
         description,
-        expectedExistingDescriptionHtml: draft.existingDescriptionHtml,
+        expectedExistingDescriptionHtml: currentDescriptionHtml,
       })
       setPublished(result)
+      setCurrentDescriptionHtml(result.publishedDescriptionHtml)
+      setCurrentDescriptionKnown(true)
       onPublished(draft.handle)
+      void loadHistory()
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
         setConflict(true)
@@ -123,21 +187,60 @@ export function ProductEditor({
     }
   }
 
-  if (published) {
-    return (
-      <section className="success-view" aria-labelledby="success-heading">
-        <div className="success-icon" aria-hidden="true">✓</div>
-        <p className="eyebrow">Published to Shopify</p>
-        <h1 id="success-heading">Description published</h1>
-        <p>
-          The new description for <strong>{product.title}</strong> is now live in
-          Shopify.
-        </p>
-        <button className="button button-primary" onClick={onBack} type="button">
-          Back to products
-        </button>
-      </section>
-    )
+  async function handleRestore(version: DescriptionVersion): Promise<boolean> {
+    if (
+      restoringVersionId !== null
+      || !currentDescriptionKnown
+      || version.publishedDescriptionHtml === currentDescriptionHtml
+    ) return false
+
+    setRestoringVersionId(version.id)
+    setRestoreConflict(false)
+    setRestoreError(null)
+    setRestoreSuccess(null)
+    setPublished(null)
+
+    try {
+      const result = await restoreDescriptionVersion(draft?.handle ?? product.handle, version.id, {
+        expectedExistingDescriptionHtml: currentDescriptionHtml,
+      })
+      setCurrentDescriptionHtml(result.publishedDescriptionHtml)
+      setCurrentDescriptionKnown(true)
+      setRestoreSuccess(`Version #${version.id} was restored and published to Shopify.`)
+      await loadHistory()
+      return true
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setRestoreConflict(true)
+      } else if (error instanceof ApiError && error.status === 404) {
+        setRestoreError('This version is no longer available for this product.')
+      } else {
+        setRestoreError('The version could not be restored. Please try again.')
+      }
+      return false
+    } finally {
+      setRestoringVersionId(null)
+    }
+  }
+
+  async function refreshCurrentProductState() {
+    if (refreshingCurrent) return
+    setRefreshingCurrent(true)
+    setRestoreError(null)
+
+    try {
+      const currentProduct = await getProductCurrentState(product.handle)
+      setCurrentDescriptionHtml(currentProduct.descriptionHtml)
+      setCurrentDescriptionKnown(true)
+      setRestoreConflict(false)
+      setRestoreSuccess(null)
+    } catch {
+      setRestoreError(
+        'The current Shopify description could not be refreshed. Return to the product list and try again.',
+      )
+    } finally {
+      setRefreshingCurrent(false)
+    }
   }
 
   return (
@@ -223,6 +326,16 @@ export function ProductEditor({
             </section>
           </div>
 
+          {published && (
+            <div className="success-banner" role="status">
+              <span aria-hidden="true">✓</span>
+              <div>
+                <strong>Description published</strong>
+                <p>The approved description is now live in Shopify.</p>
+              </div>
+            </div>
+          )}
+
           {conflict && (
             <div className="conflict-panel" role="alert">
               <div>
@@ -250,7 +363,7 @@ export function ProductEditor({
             </button>
             <button
               className="button button-primary"
-              disabled={!description.trim() || publishing || conflict}
+              disabled={!description.trim() || publishing || conflict || !currentDescriptionKnown}
               onClick={handlePublish}
               type="button"
             >
@@ -261,6 +374,29 @@ export function ProductEditor({
               )}
             </button>
           </div>
+
+          {restoreSuccess && (
+            <div className="success-banner" role="status">
+              <span aria-hidden="true">✓</span>
+              <div><strong>Version restored</strong><p>{restoreSuccess}</p></div>
+            </div>
+          )}
+
+          {restoreError && <div className="inline-error" role="alert">{restoreError}</div>}
+
+          <VersionHistory
+            conflict={restoreConflict}
+            currentDescriptionHtml={currentDescriptionHtml}
+            currentDescriptionKnown={currentDescriptionKnown}
+            error={historyError}
+            loading={historyLoading}
+            onRefreshCurrent={refreshCurrentProductState}
+            onRestore={handleRestore}
+            onRetry={() => void loadHistory()}
+            refreshingCurrent={refreshingCurrent}
+            restoringVersionId={restoringVersionId}
+            versions={history}
+          />
         </>
       )}
     </section>
