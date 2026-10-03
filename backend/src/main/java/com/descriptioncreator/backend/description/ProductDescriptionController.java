@@ -1,5 +1,7 @@
 package com.descriptioncreator.backend.description;
 
+import com.descriptioncreator.backend.usage.UsageService;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,14 +16,21 @@ import java.util.List;
 public class ProductDescriptionController {
 
     private final ProductDescriptionService productDescriptionService;
+    private final UsageService usageService;
 
-    public ProductDescriptionController(ProductDescriptionService productDescriptionService) {
+    public ProductDescriptionController(ProductDescriptionService productDescriptionService,
+            UsageService usageService) {
         this.productDescriptionService = productDescriptionService;
+        this.usageService = usageService;
     }
 
     @PostMapping("/handle/{handle}/generate-description")
-    public ProductDescriptionDraftResponse generateDescription(@PathVariable String handle) {
-        return productDescriptionService.generateDraft(handle);
+    public ProductDescriptionDraftResponse generateDescription(@PathVariable String handle,
+            Authentication authentication) {
+        usageService.assertGenerationAllowed(authentication.getName());
+        ProductDescriptionDraftResponse response = productDescriptionService.generateDraft(handle);
+        usageService.recordGeneration(authentication.getName(), response.productId(), response.handle());
+        return response;
     }
 
     @PostMapping("/handle/{handle}/publish-description")

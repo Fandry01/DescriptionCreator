@@ -1,17 +1,42 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getProducts } from './api/descriptionApi'
+import { ApiError } from './api/descriptionApi'
+import { getCurrentUser, getUsage, logout } from './api/authApi'
+import { LoginPage } from './components/LoginPage'
 import { ProductEditor } from './components/ProductEditor'
 import { ProductList } from './components/ProductList'
 import type { ProductSummary } from './types/product'
+import type { AuthUser, UsageStatus } from './types/auth'
 import './App.css'
 
 function App() {
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null)
+  const [checkingAuth, setCheckingAuth] = useState(true)
+  const [usage, setUsage] = useState<UsageStatus | null>(null)
   const [productFilter, setProductFilter] = useState<'missing' | 'all'>('missing')
   const [products, setProducts] = useState<ProductSummary[]>([])
   const [selectedProduct, setSelectedProduct] =
     useState<ProductSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const refreshUsage = useCallback(async () => {
+    try { setUsage(await getUsage()) } catch { setUsage(null) }
+  }, [])
+
+  useEffect(() => {
+    getCurrentUser()
+      .then((user) => {
+        setAuthUser(user)
+        void refreshUsage()
+      })
+      .catch((failure) => {
+        if (!(failure instanceof ApiError && failure.status === 401)) {
+          setError('Authentication could not be checked. Please try again.')
+        }
+      })
+      .finally(() => setCheckingAuth(false))
+  }, [refreshUsage])
 
   const loadProducts = useCallback(async () => {
     setLoading(true)
@@ -27,6 +52,7 @@ function App() {
   }, [productFilter])
 
   useEffect(() => {
+    if (!authUser) return
     const controller = new AbortController()
     let active = true
 
@@ -47,7 +73,23 @@ function App() {
       active = false
       controller.abort()
     }
-  }, [productFilter])
+  }, [authUser, productFilter])
+
+  function handleAuthenticated(user: AuthUser) {
+    setAuthUser(user)
+    setLoading(true)
+    setError(null)
+    void refreshUsage()
+  }
+
+  async function handleLogout() {
+    try { await logout() } finally {
+      setAuthUser(null)
+      setUsage(null)
+      setProducts([])
+      setSelectedProduct(null)
+    }
+  }
 
   function handlePublished(handle: string, publishedDescriptionHtml: string) {
     setProducts((current) => productFilter === 'missing'
@@ -65,6 +107,12 @@ function App() {
     setError(null)
   }
 
+  if (checkingAuth) {
+    return <div className="auth-loading" role="status"><span className="spinner" /> Checking session…</div>
+  }
+
+  if (!authUser) return <LoginPage onAuthenticated={handleAuthenticated} />
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -80,12 +128,17 @@ function App() {
             <small>Description Creator</small>
           </span>
         </button>
-        <span className="environment-label">Internal workspace</span>
+        <div className="header-account">
+          {usage && <span className="usage-indicator">{usage.used} / {usage.limit} generations</span>}
+          <span className="account-name">{authUser.displayName || authUser.email}</span>
+          <button className="button button-quiet" onClick={() => void handleLogout()} type="button">Logout</button>
+        </div>
       </header>
 
       <main className="app-main">
         {selectedProduct ? (
           <ProductEditor
+            onGenerated={() => void refreshUsage()}
             onBack={() => setSelectedProduct(null)}
             onPublished={handlePublished}
             product={selectedProduct}

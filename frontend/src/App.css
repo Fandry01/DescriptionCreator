@@ -59,6 +59,52 @@
   text-transform: uppercase;
 }
 
+.header-account { display: flex; align-items: center; gap: 0.8rem; }
+.usage-indicator {
+  padding: 0.4rem 0.65rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  color: var(--burgundy);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.account-name { color: var(--muted); font-size: 0.72rem; }
+
+.auth-loading,
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.5rem;
+}
+
+.auth-loading { color: var(--muted); font-size: 0.8rem; }
+.login-card {
+  width: min(28rem, 100%);
+  padding: clamp(2rem, 5vw, 3.5rem);
+  border: 1px solid var(--line);
+  border-radius: 0.45rem;
+  background: var(--surface);
+  box-shadow: 0 18px 60px rgba(48, 36, 26, 0.08);
+}
+.login-card .brand-monogram { margin-bottom: 1.5rem; }
+.login-card h1 { font-size: 2.6rem; }
+.login-intro { margin-bottom: 1.8rem; color: var(--muted); line-height: 1.55; }
+.login-field { display: grid; gap: 0.45rem; margin: 1rem 0; color: var(--muted); font-size: 0.7rem; font-weight: 700; }
+.login-field input {
+  height: 3rem;
+  padding: 0 0.85rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.3rem;
+  outline: 0;
+  color: var(--ink);
+  background: #fff;
+}
+.login-field input:focus { border-color: var(--burgundy); box-shadow: 0 0 0 3px rgba(74, 12, 12, 0.08); }
+.login-card .button-primary { width: 100%; margin-top: 1rem; }
+
 .environment-label {
   padding: 0.45rem 0.7rem;
   border: 1px solid var(--line-strong);
@@ -889,6 +935,7 @@ h1 {
 @media (max-width: 760px) {
   .app-header { min-height: 4.75rem; }
   .environment-label { display: none; }
+  .account-name { display: none; }
   .app-main { padding-top: 2.75rem; padding-bottom: 3.5rem; }
   .page-heading-row { display: block; }
   .product-count { display: block; margin-top: 1rem; }
@@ -915,6 +962,7 @@ h1 {
 @media (max-width: 560px) {
   .brand strong { font-size: 0.9rem; }
   .brand small { font-size: 0.58rem; }
+  .usage-indicator { display: none; }
   .product-filter { width: 100%; }
   .product-filter button { flex: 1; }
   .product-row { display: block; }

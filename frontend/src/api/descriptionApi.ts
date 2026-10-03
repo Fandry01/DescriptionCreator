@@ -20,14 +20,34 @@ export class ApiError extends Error {
   }
 }
 
-async function requestJson<T>(
+let csrfToken: string | null = null
+
+export async function ensureCsrfToken(): Promise<string> {
+  if (csrfToken) return csrfToken
+  const response = await fetch(`${API_BASE_URL}/api/auth/csrf`, { credentials: 'include' })
+  if (!response.ok) throw new ApiError(response.status, 'Unable to initialise request security.')
+  const body = await response.json() as { token: string }
+  csrfToken = body.token
+  return csrfToken
+}
+
+export async function requestJson<T>(
   path: string,
   options?: RequestInit,
 ): Promise<T> {
   let response: Response
 
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, options)
+    const method = options?.method?.toUpperCase() ?? 'GET'
+    const headers = new Headers(options?.headers)
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+      headers.set('X-XSRF-TOKEN', await ensureCsrfToken())
+    }
+    response = await fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers,
+      credentials: 'include',
+    })
   } catch {
     throw new ApiError(0, 'Unable to reach the server.')
   }
@@ -36,12 +56,16 @@ async function requestJson<T>(
     throw new ApiError(response.status, `Request failed with status ${response.status}.`)
   }
 
+  if (response.status === 204) return undefined as T
+
   try {
     return (await response.json()) as T
   } catch {
     throw new ApiError(response.status, 'The server returned an invalid response.')
   }
 }
+
+export function clearCsrfToken() { csrfToken = null }
 
 export function getProducts(
   missingDescription: boolean,

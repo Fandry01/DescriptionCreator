@@ -20,6 +20,7 @@ interface ProductEditorProps {
   product: ProductSummary
   onBack: () => void
   onPublished: (handle: string, publishedDescriptionHtml: string) => void
+  onGenerated: () => void
 }
 
 function htmlToPlainText(html: string | null): string {
@@ -37,6 +38,7 @@ export function ProductEditor({
   product,
   onBack,
   onPublished,
+  onGenerated,
 }: ProductEditorProps) {
   const [draft, setDraft] = useState<ProductDescriptionDraft | null>(null)
   const [description, setDescription] = useState('')
@@ -83,15 +85,16 @@ export function ProductEditor({
       setCurrentDescriptionHtml(generatedDraft.existingDescriptionHtml)
       setCurrentDescriptionKnown(true)
       setPublished(null)
-    } catch {
+      onGenerated()
+    } catch (error) {
       if (signal?.aborted) return
-      setGenerationError(
-        'A description could not be generated. Please try again.',
-      )
+      setGenerationError(error instanceof ApiError && error.status === 429
+        ? 'Your monthly description generation limit has been reached.'
+        : 'A description could not be generated. Please try again.')
     } finally {
       if (!signal?.aborted) setGenerating(false)
     }
-  }, [product.handle])
+  }, [onGenerated, product.handle])
 
   function retryDraft() {
     setGenerating(true)
