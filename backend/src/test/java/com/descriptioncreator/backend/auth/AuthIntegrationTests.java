@@ -1,6 +1,7 @@
 package com.descriptioncreator.backend.auth;
 
 import jakarta.servlet.http.HttpSession;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,6 +9,10 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.DefaultCsrfToken;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +36,7 @@ class AuthIntegrationTests {
     @Autowired MockMvc mvc;
     @Autowired AppUserRepository users;
     @Autowired PasswordEncoder encoder;
+    @Autowired CookieCsrfTokenRepository csrfTokenRepository;
 
     @BeforeEach void createUser() {
         users.save(new AppUserEntity("User@Example.com", encoder.encode("safe-password"), "Designer Stories"));
@@ -114,5 +120,20 @@ class AuthIntegrationTests {
                 .andExpect(status().isForbidden())
                 .andExpect(header().string("Access-Control-Allow-Origin", FRONTEND_ORIGIN))
                 .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+    }
+
+    @Test void csrfCookieSupportsSecureCrossOriginRequests() throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        csrfTokenRepository.saveToken(
+                new DefaultCsrfToken("X-XSRF-TOKEN", "_csrf", "test-token"),
+                new MockHttpServletRequest(), response);
+
+        Cookie cookie = response.getCookie("XSRF-TOKEN");
+        assertThat(cookie).isNotNull();
+        assertThat(cookie.getValue()).isEqualTo("test-token");
+        assertThat(cookie.getPath()).isEqualTo("/");
+        assertThat(cookie.getSecure()).isTrue();
+        assertThat(cookie.isHttpOnly()).isFalse();
+        assertThat(cookie.getAttribute("SameSite")).isEqualTo("None");
     }
 }

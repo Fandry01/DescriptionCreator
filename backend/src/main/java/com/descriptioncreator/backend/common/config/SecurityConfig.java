@@ -25,8 +25,7 @@ import java.util.List;
 public class SecurityConfig {
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        CookieCsrfTokenRepository csrf = CookieCsrfTokenRepository.withHttpOnlyFalse();
+    SecurityFilterChain securityFilterChain(HttpSecurity http, CookieCsrfTokenRepository csrf) throws Exception {
         return http
                 .cors(configurer -> configurer.configurationSource(corsConfigurationSource()))
                 .csrf(configurer -> configurer.csrfTokenRepository(csrf))
@@ -40,6 +39,16 @@ public class SecurityConfig {
                 .securityContext(context -> context
                         .securityContextRepository(securityContextRepository()))
                 .build();
+    }
+
+    @Bean
+    CookieCsrfTokenRepository csrfTokenRepository() {
+        CookieCsrfTokenRepository csrf = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        csrf.setCookieCustomizer(cookie -> cookie
+                .path("/")
+                .sameSite("None")
+                .secure(true));
+        return csrf;
     }
 
     @Bean
