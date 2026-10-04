@@ -15,6 +15,11 @@ import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.authentication.session.ChangeSessionIdAuthenticationStrategy;
 import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 public class SecurityConfig {
@@ -23,6 +28,7 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         CookieCsrfTokenRepository csrf = CookieCsrfTokenRepository.withHttpOnlyFalse();
         return http
+                .cors(configurer -> configurer.configurationSource(corsConfigurationSource()))
                 .csrf(configurer -> configurer.csrfTokenRepository(csrf))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers("/error", "/api/auth/login", "/api/auth/csrf").permitAll()
@@ -34,6 +40,19 @@ public class SecurityConfig {
                 .securityContext(context -> context
                         .securityContextRepository(securityContextRepository()))
                 .build();
+    }
+
+    @Bean
+    CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of("https://descriptioncreator-frontend.onrender.com"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("Content-Type", "X-XSRF-TOKEN"));
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }

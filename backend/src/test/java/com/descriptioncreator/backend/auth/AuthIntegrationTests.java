@@ -26,6 +26,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Transactional
 class AuthIntegrationTests {
+    private static final String FRONTEND_ORIGIN = "https://descriptioncreator-frontend.onrender.com";
+
     @Autowired MockMvc mvc;
     @Autowired AppUserRepository users;
     @Autowired PasswordEncoder encoder;
@@ -80,5 +82,37 @@ class AuthIntegrationTests {
         mvc.perform(get("/api/shopify/status")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/shopify/callback")).andExpect(result ->
                 assertThat(result.getResponse().getStatus()).isNotEqualTo(401));
+    }
+
+    @Test void allowedFrontendOriginReceivesCredentialedCorsHeaders() throws Exception {
+        mvc.perform(options("/api/auth/login")
+                        .header("Origin", FRONTEND_ORIGIN)
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "Content-Type, X-XSRF-TOKEN"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", FRONTEND_ORIGIN))
+                .andExpect(header().string("Access-Control-Allow-Credentials", "true"))
+                .andExpect(header().string("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS"))
+                .andExpect(header().string("Access-Control-Allow-Headers", "Content-Type, X-XSRF-TOKEN"))
+                .andExpect(header().doesNotExist("Access-Control-Expose-Headers"));
+    }
+
+    @Test void disallowedOriginIsNotGrantedCorsAccess() throws Exception {
+        mvc.perform(options("/api/auth/login")
+                        .header("Origin", "https://untrusted.example")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isForbidden())
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"))
+                .andExpect(header().doesNotExist("Access-Control-Allow-Credentials"));
+    }
+
+    @Test void corsDoesNotDisableCsrfProtection() throws Exception {
+        mvc.perform(post("/api/auth/login")
+                        .header("Origin", FRONTEND_ORIGIN)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"user@example.com\",\"password\":\"safe-password\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(header().string("Access-Control-Allow-Origin", FRONTEND_ORIGIN))
+                .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
     }
 }
